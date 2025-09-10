@@ -155,7 +155,7 @@ const RegisterPage: React.FC = () => {
           <div className="max-w-md w-full mx-auto">
             {/* Welcome Text */}
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Create Account</h1>
-            <p className="text-gray-600 mb-8">Join our intelligent ML agent platform</p>
+            <p className="text-gray-600 mb-8">Join the Agents4Energy platform for energy professionals</p>
 
             {/* Registration Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -248,27 +248,27 @@ const RegisterPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Side - ML Agent Information */}
-        <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-12 flex flex-col justify-center text-white relative overflow-hidden">
+        {/* Right Side - Agents4Energy Information */}
+        <div className="bg-gradient-to-br from-green-700 via-emerald-600 to-teal-700 p-12 flex flex-col justify-center text-white relative overflow-hidden">
           {/* Decorative geometric shapes */}
-          <div className="absolute top-10 right-10 w-20 h-20 border-2 border-blue-300 rounded-lg transform rotate-12 opacity-30"></div>
-          <div className="absolute bottom-20 left-10 w-6 h-6 bg-blue-300 rounded-full opacity-40"></div>
-          <div className="absolute top-1/3 left-1/4 w-3 h-3 bg-blue-200 rounded-full opacity-50"></div>
+          <div className="absolute top-10 right-10 w-20 h-20 border-2 border-orange-300 rounded-lg transform rotate-12 opacity-30"></div>
+          <div className="absolute bottom-20 left-10 w-6 h-6 bg-amber-300 rounded-full opacity-40"></div>
+          <div className="absolute top-1/3 left-1/4 w-3 h-3 bg-orange-300 rounded-full opacity-50"></div>
 
           {/* Main illustration area */}
           <div className="relative mb-8">
             <div className="w-80 h-80 mx-auto relative">
               {/* Hexagonal background */}
-              <div className="absolute inset-0 border-2 border-blue-300 opacity-20" style={{
+              <div className="absolute inset-0 border-2 border-orange-300 opacity-20" style={{
                 clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)'
               }}></div>
               
               {/* Character illustration placeholder */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-32 h-32 bg-gradient-to-b from-white to-blue-100 rounded-full flex items-center justify-center shadow-xl">
-                  <div className="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center">
+                <div className="w-32 h-32 bg-gradient-to-b from-white to-orange-100 rounded-full flex items-center justify-center shadow-xl">
+                  <div className="w-16 h-16 bg-orange-600 rounded-lg flex items-center justify-center">
                     <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                   </div>
                 </div>
@@ -278,38 +278,38 @@ const RegisterPage: React.FC = () => {
 
           {/* Content */}
           <div className="text-center space-y-6 relative z-10">
-            <h2 className="text-4xl font-bold mb-4">Join Our ML Community</h2>
+            <h2 className="text-4xl font-bold mb-4">Join the Energy Revolution</h2>
             <p className="text-xl text-gray-300 mb-8">
-              Start your journey with intelligent data analysis
+              Start accelerating your energy workloads with AI agents
             </p>
 
             {/* Feature list */}
             <div className="space-y-4 text-left max-w-md mx-auto">
               <div className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-blue-300 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="w-2 h-2 bg-orange-300 rounded-full mt-2 flex-shrink-0"></div>
                 <p className="text-gray-300">
-                  <span className="text-white font-semibold">Smart Analytics:</span> Upload and analyze your datasets with advanced machine learning algorithms
+                  <span className="text-white font-semibold">Field Data Analysis:</span> Process and analyze your energy field data with specialized AI workflows
                 </p>
               </div>
               
               <div className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="w-2 h-2 bg-orange-400 rounded-full mt-2 flex-shrink-0"></div>
                 <p className="text-gray-300">
-                  <span className="text-white font-semibold">Code Generation:</span> Get custom Python code automatically generated for your data processing needs
+                  <span className="text-white font-semibold">Production Optimization:</span> Optimize well performance and production strategies using AI insights
                 </p>
               </div>
               
               <div className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="w-2 h-2 bg-orange-400 rounded-full mt-2 flex-shrink-0"></div>
                 <p className="text-gray-300">
-                  <span className="text-white font-semibold">Interactive Chat:</span> Communicate with our AI agent to get insights and perform complex data operations
+                  <span className="text-white font-semibold">Supply Chain Intelligence:</span> Streamline operations and optimize supply chain workflows
                 </p>
               </div>
               
               <div className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="w-2 h-2 bg-orange-400 rounded-full mt-2 flex-shrink-0"></div>
                 <p className="text-gray-300">
-                  <span className="text-white font-semibold">Secure Platform:</span> Your data is protected with enterprise-grade security and privacy measures
+                  <span className="text-white font-semibold">Industry Expertise:</span> Built with centuries of energy industry experience and expertise
                 </p>
               </div>
             </div>

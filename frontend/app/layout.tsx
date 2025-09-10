@@ -5,8 +5,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'ML Agent - Intelligent Data Processing',
-  description: 'Advanced machine learning agent for data processing and analysis',
+  title: 'Agents4Energy - Generative AI for Energy Industry',
+  description: 'Open-source agentic workflows for energy industry professionals - reservoir characterization, well workover assessment, field data analysis, supply chain optimization, and asset integrity management.',
 }
 
 export default function RootLayout({

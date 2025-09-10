@@ -2817,8 +2817,8 @@ const ChatPage: React.FC = () => {
                 <Bot className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-gray-900 font-bold text-lg">ML Agent</h1>
-                <p className="text-primary-600 text-sm font-medium">Intelligent Data Assistant</p>
+                <h1 className="text-gray-900 font-bold text-lg">Agents4Energy</h1>
+                <p className="text-primary-600 text-sm font-medium">Energy Industry AI Assistant</p>
               </div>
             </div>
             <button
@@ -3060,10 +3060,10 @@ const ChatPage: React.FC = () => {
                     <Bot className="w-10 h-10 text-white" />
                   </div>
                   <h2 className="text-4xl font-bold text-gray-900 mb-5">
-                    Welcome to <span className="text-primary-600 font-bold">ML Agent</span>
+                    Welcome to <span className="text-primary-600 font-bold">Agents4Energy</span>
                   </h2>
                   <p className="text-lg text-gray-600 mb-8 leading-relaxed font-medium">
-                    Your independent AI assistant for advanced data analysis, insights, and machine learning solutions
+                    Your AI-powered energy industry assistant for reservoir analysis, production optimization, and field data insights
                   </p>
                 </div>
                 
@@ -3254,7 +3254,7 @@ const ChatPage: React.FC = () => {
                             sendMessage();
                           }
                         }}
-                        placeholder={`Ask ML Agent${activeFile ? ` about ${activeFile.file_name}` : ' anything about your data'}...`}
+                        placeholder={`Ask Energy Agent${activeFile ? ` about ${activeFile.file_name}` : ' about your energy data'}...`}
                         className="w-full bg-transparent border-none resize-none focus:outline-none text-gray-800 placeholder-gray-400 text-base leading-relaxed font-medium pr-5 py-5 min-h-[64px] max-h-[140px] transition-all duration-300 text-left pl-6"
                         rows={1}
                         onInput={(e) => {
@@ -3473,7 +3473,7 @@ const ChatPage: React.FC = () => {
               </div>
               <h3 className="text-lg font-bold text-gray-800 mb-3">No datasets yet</h3>
               <p className="text-gray-500 text-base leading-relaxed font-medium">
-                Upload your first dataset to start analyzing data with ML Agent
+                Upload your first energy dataset to start analyzing data with Agents4Energy
               </p>
             </div>
           ) : (
@@ -3586,40 +3586,54 @@ const ChatPage: React.FC = () => {
 
       {/* New Session Modal */}
       {showNewSessionModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">New Chat</h2>
-            <input
-              type="text"
-              value={newSessionName}
-              onChange={(e) => {
-                setNewSessionName(e.target.value);
-                if (newSessionError) setNewSessionError('');
-              }}
-              placeholder="Enter chat name..."
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent mb-4"
-              autoFocus
-            />
-            {newSessionError && (
-              <p className="text-red-600 text-sm mb-4">{newSessionError}</p>
-            )}
-            <div className="flex space-x-3">
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-8 w-full max-w-lg transform transition-all duration-300 scale-100">
+            <div className="flex items-center justify-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <MessageSquare className="w-8 h-8 text-white" />
+              </div>
+            </div>
+            
+            <div className="text-center mb-6">
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Start New Energy Session</h2>
+              <p className="text-gray-600 text-lg">Create a new chat session for your energy analysis</p>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">Session Name</label>
+              <input
+                type="text"
+                value={newSessionName}
+                onChange={(e) => {
+                  setNewSessionName(e.target.value);
+                  if (newSessionError) setNewSessionError('');
+                }}
+                placeholder="e.g., Reservoir Analysis Q4 2024, Well Performance Review..."
+                className="w-full px-4 py-4 bg-green-50 border-2 border-green-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-400 transition-all shadow-sm hover:shadow-md text-gray-800 placeholder-gray-500"
+                autoFocus
+              />
+              {newSessionError && (
+                <p className="text-red-600 text-sm mt-3 bg-red-50 p-3 rounded-lg border border-red-200">{newSessionError}</p>
+              )}
+            </div>
+            
+            <div className="flex space-x-4">
               <button
                 onClick={() => {
                   setShowNewSessionModal(false);
                   setNewSessionName('');
                   setNewSessionError('');
                 }}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex-1 px-6 py-4 border-2 border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all duration-300 shadow-sm hover:shadow-md"
               >
                 Cancel
               </button>
               <button
                 onClick={() => createNewSession(newSessionName)}
                 disabled={!newSessionName.trim()}
-                className="flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:shadow-lg"
               >
-                Create
+                Create Session
               </button>
             </div>
           </div>

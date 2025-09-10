@@ -127,27 +127,27 @@ const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Side - ML Agent Information */}
-        <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-12 flex flex-col justify-center text-white relative overflow-hidden">
+        {/* Right Side - Agents4Energy Information */}
+        <div className="bg-gradient-to-br from-green-700 via-emerald-600 to-teal-700 p-12 flex flex-col justify-center text-white relative overflow-hidden">
           {/* Decorative geometric shapes */}
-          <div className="absolute top-10 right-10 w-20 h-20 border border-green-400 rounded-lg transform rotate-12 opacity-30"></div>
-          <div className="absolute bottom-20 left-10 w-6 h-6 bg-yellow-400 rounded-full opacity-40"></div>
-          <div className="absolute top-1/3 left-1/4 w-3 h-3 bg-green-400 rounded-full opacity-50"></div>
+          <div className="absolute top-10 right-10 w-20 h-20 border border-orange-400 rounded-lg transform rotate-12 opacity-30"></div>
+          <div className="absolute bottom-20 left-10 w-6 h-6 bg-amber-400 rounded-full opacity-40"></div>
+          <div className="absolute top-1/3 left-1/4 w-3 h-3 bg-orange-400 rounded-full opacity-50"></div>
 
           {/* Main illustration area */}
           <div className="relative mb-8">
             <div className="w-80 h-80 mx-auto relative">
               {/* Hexagonal background */}
-              <div className="absolute inset-0 border-2 border-green-400 opacity-20" style={{
+              <div className="absolute inset-0 border-2 border-orange-400 opacity-20" style={{
                 clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)'
               }}></div>
               
               {/* Character illustration placeholder */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-32 h-32 bg-gradient-to-b from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
+                <div className="w-32 h-32 bg-gradient-to-b from-orange-400 to-orange-600 rounded-full flex items-center justify-center">
                   <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center">
-                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                   </div>
                 </div>
@@ -157,32 +157,32 @@ const LoginPage: React.FC = () => {
 
           {/* Content */}
           <div className="text-center space-y-6 relative z-10">
-            <h2 className="text-4xl font-bold mb-4">Your Intelligent ML Agent</h2>
+            <h2 className="text-4xl font-bold mb-4">Agents4Energy Platform</h2>
             <p className="text-xl text-gray-300 mb-8">
-              Empower your data with our advanced machine learning capabilities
+              Accelerate energy industry workloads with generative AI agents
             </p>
 
             {/* Feature list */}
             <div className="space-y-4 text-left max-w-md mx-auto">
               <div className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="w-2 h-2 bg-orange-400 rounded-full mt-2 flex-shrink-0"></div>
                 <p className="text-gray-300">
-                  <span className="text-white font-semibold">Data Processing:</span> Upload your datasets and let our agent analyze and process your data intelligently
+                  <span className="text-white font-semibold">Reservoir Characterization:</span> Analyze geological and engineering data to optimize field development strategies
                 </p>
               </div>
               
               <div className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="w-2 h-2 bg-orange-400 rounded-full mt-2 flex-shrink-0"></div>
                 <p className="text-gray-300">
-                  <span className="text-white font-semibold">Code Execution:</span> Our agent can execute custom code to manipulate and transform your data according to your needs
+                  <span className="text-white font-semibold">Well Assessment:</span> Evaluate workover opportunities and production optimization strategies
                 </p>
               </div>
               
               
               <div className="flex items-start space-x-3">
-                <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="w-2 h-2 bg-orange-400 rounded-full mt-2 flex-shrink-0"></div>
                 <p className="text-gray-300">
-                  <span className="text-white font-semibold">Real-time Analysis:</span> Get instant insights and results from your data processing tasks
+                  <span className="text-white font-semibold">Asset Management:</span> Optimize supply chain operations and ensure asset integrity across your portfolio
                 </p>
               </div>
             </div>
