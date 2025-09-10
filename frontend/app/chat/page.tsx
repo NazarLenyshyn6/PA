@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2, Info, Save, ChevronDown, ChevronRight, Move, Maximize2, Minimize2, RefreshCw, BookOpen, Download } from 'lucide-react';
 import { apiEndpoints, getAuthHeaders } from '@/lib/api';
-import jsPDF from 'jspdf';
 
 interface Session {
   id: string;
@@ -54,7 +53,6 @@ const ChatPage: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState('');
-  const [fileDescription, setFileDescription] = useState('');
   const [uploadError, setUploadError] = useState('');
   const [settingActiveFile, setSettingActiveFile] = useState<string | null>(null);
   const [activeFile, setActiveFile] = useState<FileItem | null>(null);
@@ -72,8 +70,6 @@ const ChatPage: React.FC = () => {
   const [fileToDelete, setFileToDelete] = useState<FileItem | null>(null);
   const [deletingSession, setDeletingSession] = useState(false);
   const [deletingFile, setDeletingFile] = useState(false);
-  const [showDatasetInfoTab, setShowDatasetInfoTab] = useState(false);
-  const [selectedDatasetInfo, setSelectedDatasetInfo] = useState<FileItem | null>(null);
   const [loadingDatasetInfo, setLoadingDatasetInfo] = useState(false);
   const [savingConversation, setSavingConversation] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
@@ -154,781 +150,6 @@ const ChatPage: React.FC = () => {
     }
   };
 
-  // Legacy export conversation to PDF with proper parsing like frontend
-  const exportToPDFLegacy = async () => {
-    if (messages.length === 0) {
-      alert('No conversation to export');
-      return;
-    }
-
-    try {
-      const pdf = new jsPDF();
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 20;
-      const maxWidth = pageWidth - 2 * margin;
-      let currentY = margin;
-
-      // Helper function to add text with proper formatting
-      const addFormattedText = (text: string, fontSize = 10, font = 'helvetica', style = 'normal') => {
-        pdf.setFontSize(fontSize);
-        pdf.setFont(font, style);
-        const lines = pdf.splitTextToSize(text, maxWidth);
-        for (const line of lines) {
-          if (currentY > pageHeight - 20) {
-            pdf.addPage();
-            currentY = margin;
-          }
-          pdf.text(line, margin, currentY);
-          currentY += fontSize * 0.6;
-        }
-        currentY += 3;
-      };
-
-      // Helper function to parse markdown-like formatting for PDF
-      const parseMarkdownForPDF = (text: string) => {
-        if (!text) return [];
-        
-        const elements = [];
-        const lines = text.split('\n');
-        
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          const trimmedLine = line.trim();
-          
-          if (!trimmedLine) {
-            elements.push({ type: 'break' });
-            continue;
-          }
-          
-          // Headers
-          const headerMatch = trimmedLine.match(/^(#{1,6})\s+(.+)$/);
-          if (headerMatch) {
-            const level = headerMatch[1].length;
-            const text = headerMatch[2];
-            elements.push({ 
-              type: 'header', 
-              level, 
-              text,
-              fontSize: Math.max(14 - level, 10)
-            });
-            continue;
-          }
-          
-          // Bullet points
-          if (trimmedLine.match(/^[•*-]\s+/)) {
-            const text = trimmedLine.replace(/^[•*-]\s+/, '');
-            elements.push({ type: 'bullet', text });
-            continue;
-          }
-          
-          // Numbered lists
-          const numberedMatch = trimmedLine.match(/^(\d+)\. (.+)$/);
-          if (numberedMatch) {
-            const number = numberedMatch[1];
-            const text = numberedMatch[2];
-            elements.push({ type: 'numbered', number, text });
-            continue;
-          }
-          
-          // Code blocks are handled separately
-          // Table detection
-          if (trimmedLine.includes('|') && lines[i + 1] && lines[i + 1].includes('|')) {
-            // Simple table handling
-            elements.push({ type: 'table_row', text: trimmedLine });
-            continue;
-          }
-          
-          // Regular paragraph
-          elements.push({ type: 'paragraph', text: trimmedLine });
-        }
-        
-        return elements;
-      };
-
-      // Add title
-      pdf.setFontSize(16);
-      pdf.setFont('helvetica', 'bold');
-      const title = `Chat Conversation - ${currentSession?.title || 'Untitled Session'}`;
-      pdf.text(title, margin, currentY);
-      currentY += 25;
-
-      // Add timestamp
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`Exported on: ${new Date().toLocaleString()}`, margin, currentY);
-      currentY += 20;
-
-      // Process each message
-      for (let i = 0; i < messages.length; i++) {
-        const message = messages[i];
-        const isUser = message.role === 'user';
-        
-        // Check if we need a new page
-        if (currentY > pageHeight - 60) {
-          pdf.addPage();
-          currentY = margin;
-        }
-
-        // Add role header
-        pdf.setFontSize(12);
-        pdf.setFont('helvetica', 'bold');
-        const roleText = isUser ? '👤 User' : '🤖 Assistant';
-        pdf.text(roleText, margin, currentY);
-        currentY += 18;
-
-        // Parse message content using same logic as frontend
-        const parts = parseMessageContent(message.content);
-        
-        for (const part of parts) {
-          if (part.type === 'text') {
-            // Parse the text content with markdown formatting
-            const markdownElements = parseMarkdownForPDF(part.content);
-            
-            for (const element of markdownElements) {
-              if (currentY > pageHeight - 30) {
-                pdf.addPage();
-                currentY = margin;
-              }
-              
-              switch (element.type) {
-                case 'header':
-                  pdf.setFontSize(element.fontSize || 12);
-                  pdf.setFont('helvetica', 'bold');
-                  pdf.text(element.text || '', margin, currentY);
-                  currentY += (element.fontSize || 12) * 0.8 + 5;
-                  break;
-                  
-                case 'bullet':
-                  pdf.setFontSize(10);
-                  pdf.setFont('helvetica', 'normal');
-                  pdf.text('• ' + (element.text || ''), margin + 10, currentY);
-                  currentY += 14;
-                  break;
-                  
-                case 'numbered':
-                  pdf.setFontSize(10);
-                  pdf.setFont('helvetica', 'normal');
-                  pdf.text(`${element.number || ''}. ${element.text || ''}`, margin + 10, currentY);
-                  currentY += 14;
-                  break;
-                  
-                case 'table_row':
-                  pdf.setFontSize(9);
-                  pdf.setFont('helvetica', 'normal');
-                  const cells = (element.text || '').split('|').map(cell => cell.trim()).filter(cell => cell);
-                  pdf.text(cells.join('  |  '), margin, currentY);
-                  currentY += 12;
-                  break;
-                  
-                case 'paragraph':
-                  // Handle inline formatting (bold, italic)
-                  let text = element.text || '';
-                  
-                  // Remove markdown formatting for PDF (since jsPDF has limited formatting)
-                  text = text
-                    .replace(/\*\*([^*]+)\*\*/g, '$1') // Bold
-                    .replace(/\*([^*]+)\*/g, '$1')       // Italic
-                    .replace(/`([^`]+)`/g, '$1');          // Inline code
-                  
-                  addFormattedText(text);
-                  break;
-                  
-                case 'break':
-                  currentY += 8;
-                  break;
-              }
-            }
-            
-          } else if (part.type === 'code') {
-            if (currentY > pageHeight - 50) {
-              pdf.addPage();
-              currentY = margin;
-            }
-            
-            // Add code block with background
-            const codeHeight = part.content.split('\n').length * 5 + 20;
-            pdf.setFillColor(245, 245, 245);
-            pdf.rect(margin, currentY - 5, maxWidth, Math.min(codeHeight, pageHeight - currentY - 20), 'F');
-            
-            // Add code header
-            pdf.setFontSize(9);
-            pdf.setFont('helvetica', 'bold');
-            pdf.text(`Code (${part.language || 'text'}):`, margin + 5, currentY + 8);
-            currentY += 15;
-            
-            // Add code content
-            pdf.setFontSize(8);
-            pdf.setFont('courier', 'normal');
-            const codeLines = part.content.split('\n');
-            for (const line of codeLines) {
-              if (currentY > pageHeight - 20) {
-                pdf.addPage();
-                currentY = margin;
-              }
-              pdf.text(line, margin + 5, currentY);
-              currentY += 10;
-            }
-            currentY += 10;
-            
-          } else if (part.type === 'image') {
-            if (currentY > pageHeight - 100) {
-              pdf.addPage();
-              currentY = margin;
-            }
-            
-            // Try to embed actual image
-            try {
-              let imgData = part.content;
-              
-              // Extract base64 from markdown format if needed
-              const base64Match = part.content.match(/!\[.*?\]\(data:image\/[^;]+;base64,([^)]+)\)/);
-              if (base64Match) {
-                imgData = `data:image/png;base64,${base64Match[1]}`;
-              } else if (part.content.includes('data:image')) {
-                // Handle direct base64 format
-                const directMatch = part.content.match(/data:image\/[^;]+;base64,([^\s\)]+)/);
-                if (directMatch) {
-                  const fullMatch = part.content.match(/data:image\/[^;]+;base64,[^\s\)]+/);
-                  if (fullMatch) {
-                    imgData = fullMatch[0];
-                  }
-                }
-              }
-              
-              if (imgData.startsWith('data:image')) {
-                const imgWidth = Math.min(maxWidth, 160);
-                const imgHeight = imgWidth * 0.6; // Reasonable aspect ratio
-                
-                // Add image label
-                pdf.setFontSize(9);
-                pdf.setFont('helvetica', 'italic');
-                pdf.text('[Generated Visualization]', margin, currentY);
-                currentY += 12;
-                
-                // Add the image
-                pdf.addImage(imgData, 'PNG', margin, currentY, imgWidth, imgHeight);
-                currentY += imgHeight + 15;
-              } else {
-                // Fallback if image can't be processed
-                pdf.setFontSize(9);
-                pdf.setFont('helvetica', 'italic');
-                pdf.text('[Image: Generated visualization - could not embed]', margin, currentY);
-                currentY += 15;
-              }
-            } catch (imgError) {
-              console.warn('Failed to embed image in PDF:', imgError);
-              pdf.setFontSize(9);
-              pdf.setFont('helvetica', 'italic');
-              pdf.text('[Image: Generated visualization - embedding failed]', margin, currentY);
-              currentY += 15;
-            }
-          }
-        }
-        
-        // Add separator between messages
-        currentY += 8;
-        if (currentY < pageHeight - 25) {
-          pdf.setLineWidth(0.3);
-          pdf.setDrawColor(180, 180, 180);
-          pdf.line(margin, currentY, pageWidth - margin, currentY);
-          currentY += 15;
-        }
-      }
-
-      // Save the PDF
-      const fileName = `chat-conversation-${currentSession?.title?.replace(/[^a-zA-Z0-9]/g, '-') || 'untitled'}-${new Date().toISOString().split('T')[0]}.pdf`;
-      pdf.save(fileName);
-      
-    } catch (error) {
-      console.error('Failed to export PDF:', error);
-      alert('Failed to export PDF. Please try again.');
-    }
-  };
-
-  // PDF export using EXACT same parsing as frontend display (1:1 translation)
-  // Exports ENTIRE chat history from memory, not just current messages
-  const exportToPDF = async (filename?: string) => {
-    try {
-      // First, load the complete chat history from backend
-      console.log('Loading complete chat history for PDF export...');
-      
-      if (!currentSession?.id || !activeFile?.file_name) {
-        alert('Missing session or file information for export');
-        return;
-      }
-
-      const response = await fetch(apiEndpoints.chatHistory, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
-
-      let chatHistory: ChatHistoryItem[] = [];
-      
-      if (response.ok) {
-        chatHistory = await response.json();
-        console.log('📖 Loaded chat history for PDF:', chatHistory.length, 'items');
-      } else {
-        console.log('⚠️ Could not load chat history, using current messages only');
-      }
-
-      // If no chat history from backend, use current messages as fallback
-      if (chatHistory.length === 0 && messages.length === 0) {
-        alert('No conversation data to export');
-        return;
-      }
-
-      // Initialize PDF generation
-      const pdf = new jsPDF();
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 20;
-      const maxWidth = pageWidth - 2 * margin;
-      let currentY = margin;
-
-      // Helper to check page breaks
-      const checkPageBreak = (height: number) => {
-        if (currentY + height > pageHeight - margin) {
-          pdf.addPage();
-          currentY = margin;
-        }
-      };
-
-      // Convert frontend renderMarkdownText elements to PDF
-      const renderMarkdownElementToPDF = (element: any) => {
-        if (!element) return;
-        
-        if (typeof element === 'string') {
-          // Plain text
-          const lines = pdf.splitTextToSize(element, maxWidth);
-          checkPageBreak(lines.length * 14 + 10);
-          pdf.setFontSize(11);
-          pdf.setFont('helvetica', 'normal');
-          for (const line of lines) {
-            pdf.text(line, margin, currentY);
-            currentY += 14;
-          }
-          currentY += 8;
-          return;
-        }
-
-        if (!element.type) return;
-
-        switch (element.type) {
-          case 'h1':
-          case 'h2':
-          case 'h3':
-          case 'h4':
-          case 'h5':
-          case 'h6':
-            const headerLevel = parseInt(element.type[1]);
-            const fontSize = Math.max(18 - headerLevel, 12);
-            checkPageBreak(fontSize + 15);
-            pdf.setFontSize(fontSize);
-            pdf.setFont('helvetica', 'bold');
-            pdf.text(element.props?.children || '', margin, currentY);
-            currentY += fontSize + 15;
-            break;
-
-          case 'p':
-            const text = element.props?.children || '';
-            const lines = pdf.splitTextToSize(text, maxWidth);
-            checkPageBreak(lines.length * 14 + 12);
-            pdf.setFontSize(11);
-            pdf.setFont('helvetica', 'normal');
-            for (const line of lines) {
-              pdf.text(line, margin, currentY);
-              currentY += 14;
-            }
-            currentY += 12;
-            break;
-
-          case 'li':
-            checkPageBreak(18);
-            pdf.setFontSize(11);
-            pdf.setFont('helvetica', 'normal');
-            pdf.text('•', margin + 10, currentY);
-            const bulletText = element.props?.children || '';
-            const bulletLines = pdf.splitTextToSize(bulletText, maxWidth - 30);
-            for (const line of bulletLines) {
-              pdf.text(line, margin + 20, currentY);
-              currentY += 14;
-            }
-            currentY += 4;
-            break;
-
-          case 'pre':
-            const codeContent = element.props?.children?.props?.children || '';
-            const codeLines = codeContent.split('\n');
-            const codeHeight = codeLines.length * 12 + 20;
-            checkPageBreak(codeHeight);
-            
-            // Gray background
-            pdf.setFillColor(245, 245, 245);
-            pdf.rect(margin, currentY - 5, maxWidth, codeHeight - 10, 'F');
-            
-            pdf.setFontSize(9);
-            pdf.setFont('courier', 'normal');
-            for (const line of codeLines) {
-              pdf.text(line, margin + 5, currentY + 5);
-              currentY += 12;
-            }
-            currentY += 15;
-            break;
-
-          default:
-            // Handle nested children
-            if (element.props?.children) {
-              if (Array.isArray(element.props.children)) {
-                element.props.children.forEach((child: any) => renderMarkdownElementToPDF(child));
-              } else {
-                renderMarkdownElementToPDF(element.props.children);
-              }
-            }
-            break;
-        }
-      };
-
-      // Process each message using SAME logic as frontend
-      const processMessages = async () => {
-        // Add title
-        pdf.setFontSize(16);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(`Chat Conversation - ${currentSession?.title || 'Untitled'}`, margin, currentY);
-        currentY += 25;
-
-        pdf.setFontSize(10);
-        pdf.setFont('helvetica', 'normal');
-        pdf.text(`Exported: ${new Date().toLocaleString()}`, margin, currentY);
-        currentY += 25;
-
-        // Process data from chat history (preferred) or current messages (fallback)
-        if (chatHistory.length > 0) {
-          console.log('📄 Processing complete chat history for PDF...');
-          
-          // Process chat history format: {question: string, answer: string | string[]}
-          for (const historyItem of chatHistory) {
-            // USER QUESTION
-            checkPageBreak(20);
-            pdf.setFontSize(12);
-            pdf.setFont('helvetica', 'bold');
-            pdf.text('👤 User', margin, currentY);
-            currentY += 20;
-            
-            // Parse user question using same logic as frontend
-            const questionParts = parseMessageContent(historyItem.question);
-            await processMessageParts(questionParts);
-            
-            // ASSISTANT ANSWER  
-            checkPageBreak(20);
-            pdf.setFontSize(12);
-            pdf.setFont('helvetica', 'bold');
-            pdf.text('🤖 Assistant', margin, currentY);
-            currentY += 20;
-            
-            // Handle answer (string or array format from memory)
-            const cleanAnswer = parseAnswerContent(historyItem.answer);
-            const answerParts = parseMessageContent(cleanAnswer);
-            await processMessageParts(answerParts);
-            
-            // Separator
-            currentY += 10;
-            if (currentY < pageHeight - 30) {
-              pdf.setLineWidth(0.3);
-              pdf.setDrawColor(200, 200, 200);
-              pdf.line(margin, currentY, pageWidth - margin, currentY);
-              currentY += 15;
-            }
-          }
-        } else {
-          console.log('📄 Processing current messages for PDF...');
-          
-          // Fallback: process current messages
-          for (const message of messages) {
-            // Role header
-            checkPageBreak(20);
-            pdf.setFontSize(12);
-            pdf.setFont('helvetica', 'bold');
-            const roleText = message.role === 'user' ? '👤 User' : '🤖 Assistant';
-            pdf.text(roleText, margin, currentY);
-            currentY += 20;
-
-            // Use EXACT same parsing as frontend
-            const parts = parseMessageContent(message.content);
-            await processMessageParts(parts);
-            
-            // Message separator
-            currentY += 10;
-            if (currentY < pageHeight - 30) {
-              pdf.setLineWidth(0.3);
-              pdf.setDrawColor(200, 200, 200);
-              pdf.line(margin, currentY, pageWidth - margin, currentY);
-              currentY += 15;
-            }
-          }
-        }
-
-        // Helper function to process message parts (shared between both paths)
-        async function processMessageParts(parts: any[]) {
-          
-          for (const part of parts) {
-            if (part.type === 'text') {
-              // Clean and parse the text content for human readability
-              let cleanText = part.content;
-              
-              // Remove any streaming format artifacts
-              cleanText = parseHistoricalMessage(cleanText);
-              
-              // Use SAME renderMarkdownText logic as frontend
-              const elements = renderMarkdownText(cleanText);
-              
-              // Process the parsed markdown elements
-              if (elements && elements.props && elements.props.children) {
-                await processReactElements(elements.props.children);
-              } else {
-                // Fallback: process as plain text with basic formatting
-                await processPlainText(cleanText);
-              }
-
-            } else if (part.type === 'code') {
-              // Code blocks - same as frontend
-              const codeLines = part.content.split('\n');
-              const codeHeight = codeLines.length * 12 + 25;
-              checkPageBreak(codeHeight);
-
-              pdf.setFillColor(245, 245, 245);
-              pdf.rect(margin, currentY - 5, maxWidth, codeHeight - 10, 'F');
-              
-              pdf.setFontSize(9);
-              pdf.setFont('helvetica', 'bold');
-              pdf.text(`Code (${part.language || 'text'}):`, margin + 5, currentY + 8);
-              currentY += 15;
-
-              pdf.setFontSize(8);
-              pdf.setFont('courier', 'normal');
-              for (const line of codeLines) {
-                pdf.text(line, margin + 5, currentY);
-                currentY += 12;
-              }
-              currentY += 15;
-
-            } else if (part.type === 'image') {
-              // Images - same extraction as frontend
-              await new Promise<void>((resolve) => {
-                try {
-                  let imgData = part.content;
-                  
-                  // Use SAME image extraction logic
-                  const base64Match = part.content.match(/!\[.*?\]\(data:image\/[^;]+;base64,([^)]+)\)/);
-                  if (base64Match) {
-                    imgData = `data:image/png;base64,${base64Match[1]}`;
-                  } else if (part.content.includes('data:image')) {
-                    const directMatch = part.content.match(/data:image\/[^;]+;base64,([^\s\)]+)/);
-                    if (directMatch) {
-                      const fullMatch = part.content.match(/data:image\/[^;]+;base64,[^\s\)]+/);
-                      if (fullMatch) {
-                        imgData = fullMatch[0];
-                      }
-                    }
-                  }
-                  
-                  if (imgData.startsWith('data:image')) {
-                    const imgWidth = Math.min(maxWidth * 0.8, 400);
-                    const imgHeight = imgWidth * 0.6;
-                    
-                    checkPageBreak(imgHeight + 25);
-                    
-                    const xPosition = margin + (maxWidth - imgWidth) / 2;
-                    pdf.addImage(imgData, 'PNG', xPosition, currentY, imgWidth, imgHeight);
-                    currentY += imgHeight + 20;
-                  } else {
-                    currentY += 15;
-                  }
-                } catch (error) {
-                  console.error('Image error:', error);
-                  currentY += 15;
-                }
-                resolve();
-              });
-            }
-          }
-        }
-
-        // Helper function to process React elements into human-readable PDF content
-        async function processReactElements(children: any) {
-          const childArray = Array.isArray(children) ? children : [children];
-          
-          for (const child of childArray) {
-            if (typeof child === 'string') {
-              // Plain text - clean and format
-              if (child.trim()) {
-                await processPlainText(child);
-              }
-            } else if (child && child.type) {
-              // React elements - convert to appropriate PDF formatting
-              switch (child.type) {
-                case 'h1':
-                case 'h2':
-                case 'h3':
-                case 'h4':
-                case 'h5':
-                case 'h6':
-                  const level = parseInt(child.type[1]);
-                  const headerSize = Math.max(16 - level * 2, 12);
-                  checkPageBreak(headerSize + 10);
-                  pdf.setFontSize(headerSize);
-                  pdf.setFont('helvetica', 'bold');
-                  const headerText = extractTextContent(child.props?.children);
-                  pdf.text(headerText, margin, currentY);
-                  currentY += headerSize + 8;
-                  break;
-
-                case 'p':
-                  const paraText = extractTextContent(child.props?.children);
-                  if (paraText.trim()) {
-                    await processPlainText(paraText);
-                    currentY += 6; // Extra paragraph spacing
-                  }
-                  break;
-
-                case 'div':
-                  // Check for special div classes (like bullet points)
-                  const className = child.props?.className || '';
-                  if (className.includes('flex items-start')) {
-                    // Bullet point
-                    const bulletText = extractTextContent(child.props?.children);
-                    if (bulletText.trim()) {
-                      checkPageBreak(16);
-                      pdf.setFontSize(11);
-                      pdf.setFont('helvetica', 'normal');
-                      pdf.text('•', margin + 10, currentY);
-                      const lines = pdf.splitTextToSize(bulletText, maxWidth - 30);
-                      for (const line of lines) {
-                        pdf.text(line, margin + 20, currentY);
-                        currentY += 14;
-                      }
-                      currentY += 4;
-                    }
-                  } else {
-                    // Regular div - process children
-                    if (child.props?.children) {
-                      await processReactElements(child.props.children);
-                    }
-                  }
-                  break;
-
-                case 'table':
-                  await processTable(child);
-                  break;
-
-                case 'pre':
-                  await processCodeBlock(child);
-                  break;
-
-                default:
-                  // Process children for unknown elements
-                  if (child.props?.children) {
-                    await processReactElements(child.props.children);
-                  }
-                  break;
-              }
-            }
-          }
-        }
-
-        // Helper function to process plain text with proper formatting
-        async function processPlainText(text: string) {
-          if (!text || !text.trim()) return;
-          
-          // Clean the text
-          const cleanedText = text
-            .replace(/\s+/g, ' ')  // Normalize whitespace
-            .trim();
-          
-          const lines = pdf.splitTextToSize(cleanedText, maxWidth);
-          checkPageBreak(lines.length * 14 + 6);
-          
-          pdf.setFontSize(11);
-          pdf.setFont('helvetica', 'normal');
-          
-          for (const line of lines) {
-            pdf.text(line, margin, currentY);
-            currentY += 14;
-          }
-          currentY += 8;
-        }
-
-        // Helper function to extract text content from React elements
-        function extractTextContent(element: any): string {
-          if (typeof element === 'string') {
-            return element;
-          }
-          
-          if (Array.isArray(element)) {
-            return element.map(extractTextContent).join('');
-          }
-          
-          if (element && element.props && element.props.children) {
-            return extractTextContent(element.props.children);
-          }
-          
-          return '';
-        }
-
-        // Helper function to process tables
-        async function processTable(tableElement: any) {
-          // Simple table processing - extract rows and cells
-          const tableText = extractTextContent(tableElement);
-          if (tableText.trim()) {
-            checkPageBreak(50);
-            pdf.setFontSize(10);
-            pdf.setFont('helvetica', 'normal');
-            
-            // Process as simple text for now (could be enhanced for proper table layout)
-            const lines = pdf.splitTextToSize(tableText, maxWidth);
-            for (const line of lines) {
-              pdf.text(line, margin, currentY);
-              currentY += 12;
-            }
-            currentY += 8;
-          }
-        }
-
-        // Helper function to process code blocks
-        async function processCodeBlock(preElement: any) {
-          const codeText = extractTextContent(preElement);
-          if (codeText.trim()) {
-            const codeLines = codeText.split('\n');
-            const codeHeight = codeLines.length * 12 + 20;
-            checkPageBreak(codeHeight);
-            
-            // Gray background
-            pdf.setFillColor(245, 245, 245);
-            pdf.rect(margin, currentY - 5, maxWidth, codeHeight - 10, 'F');
-            
-            pdf.setFontSize(9);
-            pdf.setFont('courier', 'normal');
-            
-            for (const line of codeLines) {
-              pdf.text(line, margin + 5, currentY + 5);
-              currentY += 12;
-            }
-            currentY += 15;
-          }
-        }
-
-        // Save PDF
-        const pdfFilename = filename || `chat-${currentSession?.title?.replace(/[^a-zA-Z0-9]/g, '-') || 'conversation'}-${new Date().toISOString().split('T')[0]}.pdf`;
-        pdf.save(pdfFilename);
-      };
-
-      processMessages();
-
-    } catch (error) {
-      console.error('PDF export failed:', error);
-      alert('PDF export failed. Please try again.');
-    }
-  };
 
 
   // Resend the last user question
@@ -1433,7 +654,7 @@ const ChatPage: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {dataRows.map((row, rowIdx) => (
-                    <tr key={rowIdx} className={`${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-25'} hover:bg-blue-50 transition-colors duration-150`}>
+                    <tr key={rowIdx} className={`${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-25'} hover:bg-aqua-50 transition-colors duration-150`}>
                       {row.map((cell, cellIdx) => (
                         <td key={cellIdx} className="px-4 py-3 text-sm text-gray-800 border-b border-gray-100">
                           {parseInlineFormatting(cell)}
@@ -2146,7 +1367,7 @@ const ChatPage: React.FC = () => {
       const formData = new FormData();
       formData.append('file', selectedFile);
       formData.append('file_name', fileName.trim());
-      formData.append('description', fileDescription.trim());
+      formData.append('description', '');
 
       const response = await fetch(apiEndpoints.files, {
         method: 'POST',
@@ -2165,7 +1386,6 @@ const ChatPage: React.FC = () => {
         setShowUploadModal(false);
         setSelectedFile(null);
         setFileName('');
-        setFileDescription('');
         setUploadProgress(100);
       } else {
         const errorData = await response.json().catch(() => ({}));
@@ -2357,56 +1577,6 @@ const ChatPage: React.FC = () => {
     }
   };
 
-  // Get dataset info
-  const getDatasetInfo = async (fileName: string) => {
-    setLoadingDatasetInfo(true);
-    try {
-      // First set the file as active to get its detailed info
-      let response = await fetch(`${apiEndpoints.files}/active/`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          file_name: fileName,
-        }),
-      });
-
-      // If that fails with 405, try without trailing slash
-      if (!response.ok && response.status === 405) {
-        console.log('POST /files/active/ failed with 405 for dataset info, trying without trailing slash...');
-        response = await fetch(`${apiEndpoints.files}/active`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            file_name: fileName,
-          }),
-        });
-      }
-
-      if (response.ok) {
-        // Now get the active file details
-        const activeResponse = await fetch(`${apiEndpoints.files}/active`, {
-          method: 'GET',
-          headers: getAuthHeaders(),
-        });
-
-        if (activeResponse.ok) {
-          const datasetInfo = await activeResponse.json();
-          setSelectedDatasetInfo(datasetInfo);
-          setShowDatasetInfoTab(true);
-        } else {
-          console.error('Failed to get dataset info after setting file as active');
-        }
-      } else {
-        console.error(`Failed to set file as active for info retrieval, status: ${response.status}`);
-        // Show an error message to the user
-        alert(`Unable to retrieve dataset information. The backend may not support this feature yet.`);
-      }
-    } catch (error) {
-      console.error('Error getting dataset info:', error);
-    } finally {
-      setLoadingDatasetInfo(false);
-    }
-  };
 
   // Save conversation
   const saveConversation = async () => {
@@ -2813,7 +1983,7 @@ const ChatPage: React.FC = () => {
         <div className="p-6 border-b border-gray-200 bg-white shadow-soft">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center space-x-3">
-              <div className="w-11 h-11 bg-primary-600 rounded-2xl flex items-center justify-center shadow-soft hover:shadow-medium transition-all duration-200 hover:bg-primary-700">
+              <div className="w-11 h-11 bg-aws-500 rounded-2xl flex items-center justify-center shadow-soft hover:shadow-medium transition-all duration-200 hover:bg-aws-600">
                 <Bot className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -2831,7 +2001,7 @@ const ChatPage: React.FC = () => {
           </div>
           <button
             onClick={() => setShowNewSessionModal(true)}
-            className="w-full flex items-center justify-center space-x-3 px-5 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-2xl transition-all duration-200 font-semibold shadow-soft hover:shadow-medium hover:scale-[1.02]"
+            className="w-full flex items-center justify-center space-x-3 px-5 py-3.5 bg-aws-500 hover:bg-energy-600 text-white rounded-2xl transition-all duration-200 font-semibold shadow-soft hover:shadow-medium hover:scale-[1.02]"
           >
             <Plus className="w-5 h-5" />
             <span className="text-base">New Chat</span>
@@ -2932,7 +2102,7 @@ const ChatPage: React.FC = () => {
         {/* Sidebar Footer */}
         <div className="p-5 border-t border-gray-200 bg-white shadow-soft">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-primary-600 rounded-2xl flex items-center justify-center shadow-soft hover:shadow-medium transition-all duration-200 hover:bg-primary-700">
+            <div className="w-10 h-10 bg-aws-500 rounded-2xl flex items-center justify-center shadow-soft hover:shadow-medium transition-all duration-200 hover:bg-aws-600">
               <User className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1 min-w-0">
@@ -3010,22 +2180,6 @@ const ChatPage: React.FC = () => {
               </div>
             )}
             
-            {/* PDF Export Button */}
-            {(messages.length > 0 || currentSession?.id) && (
-              <button
-                onClick={async () => await exportToPDF()}
-                disabled={isLoading}
-                className={`flex items-center space-x-2 px-4 py-3 rounded-2xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-105 font-semibold ${
-                  isLoading
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-medium hover:shadow-strong'
-                }`}
-                title={isLoading ? "Please wait for the response to complete" : "Export conversation to PDF"}
-              >
-                <Download className="w-5 h-5" />
-                <span>PDF</span>
-              </button>
-            )}
             
             <button
               onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
@@ -3087,7 +2241,7 @@ const ChatPage: React.FC = () => {
                 
                 <button
                   onClick={() => setShowNewSessionModal(true)}
-                  className="inline-flex items-center space-x-3 px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold text-base rounded-2xl transition-all duration-200 shadow-medium hover:shadow-strong"
+                  className="inline-flex items-center space-x-3 px-8 py-4 bg-aws-500 hover:bg-energy-600 text-white font-bold text-base rounded-2xl transition-all duration-200 shadow-medium hover:shadow-strong"
                 >
                   <Plus className="w-6 h-6" />
                   <span>Start New Conversation</span>
@@ -3146,7 +2300,7 @@ const ChatPage: React.FC = () => {
                                 {/* Copy message button */}
                                 <button
                                   onClick={() => copyMessageToClipboard(message.content, message.id)}
-                                  className={`relative group/btn flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ease-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400/30 ${
+                                  className={`relative group/btn flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ease-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-aws-400/30 ${
                                     copiedMessage === message.id 
                                       ? 'bg-green-50 text-green-600 border border-green-200 shadow-sm' 
                                       : 'bg-gray-50/80 text-gray-500 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md border border-gray-200/60'
@@ -3171,7 +2325,7 @@ const ChatPage: React.FC = () => {
                                 {/* Reload/resend button */}
                                 <button
                                   onClick={resendLastQuestion}
-                                  className={`relative group/btn flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ease-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400/30 ${
+                                  className={`relative group/btn flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ease-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-aws-400/30 ${
                                     isLoading 
                                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' 
                                       : 'bg-gray-50/80 text-gray-500 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md border border-gray-200/60'
@@ -3281,7 +2435,7 @@ const ChatPage: React.FC = () => {
                         disabled={!inputMessage.trim() || isLoading}
                         className={`group relative overflow-hidden rounded-xl transition-all duration-300 ${
                           inputMessage.trim() && !isLoading
-                            ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 hover:from-blue-600 hover:via-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-600/40 hover:scale-105 active:scale-95'
+                            ? 'bg-gradient-to-br from-aws-500 via-aws-600 to-aws-700 hover:from-energy-600 hover:via-energy-700 hover:to-energy-800 text-white shadow-lg shadow-aws-500/30 hover:shadow-xl hover:shadow-energy-600/40 hover:scale-105 active:scale-95'
                             : 'bg-gradient-to-br from-gray-200 to-gray-300 text-gray-500 cursor-not-allowed shadow-sm'
                         } p-3 min-w-[48px] min-h-[48px] flex items-center justify-center`}
                       >
@@ -3332,34 +2486,17 @@ const ChatPage: React.FC = () => {
         <div className="p-6 border-b border-gray-200 bg-white shadow-soft">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center space-x-3">
-              <div className="w-11 h-11 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-soft hover:shadow-medium transition-all duration-200 hover:bg-indigo-700">
-                {showDatasetInfoTab ? <Info className="w-6 h-6 text-white" /> : <Database className="w-6 h-6 text-white" />}
+              <div className="w-11 h-11 bg-aws-500 rounded-2xl flex items-center justify-center shadow-soft hover:shadow-medium transition-all duration-200 hover:bg-aws-600">
+                <Database className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-gray-900">
-                  {showDatasetInfoTab ? 'Dataset Information' : 'Dataset Files'}
-                </h2>
-                <p className="text-sm text-indigo-600 font-medium">
-                  {showDatasetInfoTab 
-                    ? 'Detailed analysis summary' 
-                    : `${files.length} file${files.length !== 1 ? 's' : ''} available`
-                  }
+                <h2 className="text-lg font-bold text-gray-900">Energy Datasets</h2>
+                <p className="text-sm text-aws-600 font-medium">
+                  {`${files.length} dataset${files.length !== 1 ? 's' : ''} available`}
                 </p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              {showDatasetInfoTab && (
-                <button
-                  onClick={() => {
-                    setShowDatasetInfoTab(false);
-                    setSelectedDatasetInfo(null);
-                  }}
-                  className="p-2.5 hover:bg-indigo-50 rounded-2xl transition-all duration-200 group shadow-soft hover:shadow-medium hover:scale-110"
-                  title="Back to files"
-                >
-                  <ArrowRight className="w-5 h-5 text-indigo-500 group-hover:text-indigo-700 rotate-180" />
-                </button>
-              )}
               <button
                 onClick={() => setRightSidebarOpen(false)}
                 className="p-2.5 hover:bg-primary-50 rounded-2xl transition-all duration-200 group shadow-soft hover:shadow-medium hover:scale-110"
@@ -3368,108 +2505,29 @@ const ChatPage: React.FC = () => {
               </button>
             </div>
           </div>
-          {!showDatasetInfoTab && (
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="w-full flex items-center justify-center space-x-3 px-5 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all duration-200 font-semibold shadow-soft hover:shadow-medium hover:scale-[1.02]"
-            >
-              <Upload className="w-5 h-5" />
-              <span>Upload Dataset</span>
-              <div className="w-2 h-2 bg-white/30 rounded-full animate-bounce-subtle"></div>
-            </button>
-          )}
+          <button
+            onClick={() => setShowUploadModal(true)}
+            className="w-full flex items-center justify-center space-x-3 px-5 py-3.5 bg-aws-500 hover:bg-energy-600 text-white rounded-2xl transition-all duration-200 font-semibold shadow-soft hover:shadow-medium hover:scale-[1.02]"
+          >
+            <Upload className="w-5 h-5" />
+            <span>Upload Dataset</span>
+            <div className="w-2 h-2 bg-white/30 rounded-full animate-bounce-subtle"></div>
+          </button>
         </div>
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {showDatasetInfoTab && selectedDatasetInfo ? (
-            // Dataset Info Tab
-            <div className="space-y-6">
-              {/* Dataset Name */}
-              <div className="bg-primary-50 rounded-2xl p-5 border border-primary-200 shadow-soft">
-                <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center">
-                  <File className="w-4 h-4 mr-2.5 text-primary-600" />
-                  Dataset Name
-                </h3>
-                <p className="text-base font-semibold text-primary-700 bg-white px-3.5 py-2.5 rounded-xl shadow-soft border border-primary-200 break-all">
-                  {selectedDatasetInfo.file_name}
-                </p>
-              </div>
-
-              {/* Description */}
-              {selectedDatasetInfo.description && (
-                <div className="bg-orange-50 rounded-2xl p-5 border border-orange-200 shadow-soft">
-                  <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center">
-                    <FileText className="w-4 h-4 mr-2.5 text-orange-600" />
-                    Description
-                  </h3>
-                  <p className="text-gray-700 bg-white px-3.5 py-2.5 rounded-xl shadow-soft border border-orange-200 leading-relaxed">
-                    {selectedDatasetInfo.description}
-                  </p>
-                </div>
-              )}
-
-              {/* Summary */}
-              {selectedDatasetInfo.summary && (
-                <div className="bg-purple-50 rounded-2xl p-5 border border-purple-200 shadow-soft">
-                  <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center">
-                    <Database className="w-4 h-4 mr-2.5 text-purple-600" />
-                    Data Summary
-                  </h3>
-                  <div className="bg-white px-3.5 py-2.5 rounded-xl shadow-soft border border-purple-200">
-                    <div className="prose prose-sm max-w-none text-gray-700">
-                      {selectedDatasetInfo.summary.split('\n').map((line, index) => (
-                        <div key={index} className="mb-2">
-                          {line.startsWith('**') && line.endsWith('**') ? (
-                            <strong className="text-purple-700">{line.slice(2, -2)}</strong>
-                          ) : line.startsWith('- **') ? (
-                            <div className="ml-4 flex items-start">
-                              <span className="text-purple-600 mr-2">•</span>
-                              <span dangerouslySetInnerHTML={{ 
-                                __html: line.slice(2).replace(/\*\*(.*?)\*\*/g, '<strong class="text-purple-700">$1</strong>') 
-                              }} />
-                            </div>
-                          ) : (
-                            <span dangerouslySetInnerHTML={{ 
-                              __html: line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-purple-700">$1</strong>') 
-                            }} />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Set Active Button */}
-              <div className="sticky bottom-0 bg-white pt-4 border-t border-gray-200">
-                <button
-                  onClick={async () => {
-                    if (currentSession && selectedDatasetInfo) {
-                      await setActiveFileForSession(selectedDatasetInfo.file_name);
-                      setShowDatasetInfoTab(false);
-                      setSelectedDatasetInfo(null);
-                    }
-                  }}
-                  disabled={!currentSession}
-                  className="w-full px-6 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl transition-all duration-200 font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3"
-                >
-                  <Database className="w-5 h-5" />
-                  <span>Set as Active Dataset</span>
-                </button>
-              </div>
-            </div>
-          ) : loadingFiles ? (
+          {loadingFiles ? (
             <div className="flex items-center justify-center py-16">
               <div className="flex flex-col items-center space-y-6">
-                <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin shadow-lg"></div>
+                <div className="w-10 h-10 border-3 border-aws-500 border-t-transparent rounded-full animate-spin shadow-lg"></div>
                 <p className="text-gray-600 font-semibold text-lg">Loading datasets...</p>
               </div>
             </div>
           ) : files.length === 0 ? (
             <div className="text-center py-12">
-              <div className="w-16 h-16 bg-indigo-100 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-medium">
-                <FileText className="w-8 h-8 text-indigo-500" />
+              <div className="w-16 h-16 bg-aws-100 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-medium">
+                <FileText className="w-8 h-8 text-aws-500" />
               </div>
               <h3 className="text-lg font-bold text-gray-800 mb-3">No datasets yet</h3>
               <p className="text-gray-500 text-base leading-relaxed font-medium">
@@ -3478,7 +2536,7 @@ const ChatPage: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className="text-indigo-600 text-sm font-semibold uppercase tracking-wider mb-4 px-2">
+              <div className="text-aws-600 text-sm font-semibold uppercase tracking-wider mb-4 px-2">
                 Available Datasets
               </div>
               <div className="space-y-3">
@@ -3490,15 +2548,15 @@ const ChatPage: React.FC = () => {
                   >
                     <div className={`group relative p-4 rounded-2xl border transition-all duration-300 overflow-hidden shadow-soft hover:shadow-medium ${
                         activeFile?.file_name === file.file_name
-                          ? 'bg-indigo-50 border-indigo-300 shadow-medium'
-                          : 'bg-white border-gray-200 hover:border-indigo-200 hover:shadow-strong hover:bg-indigo-50/30 hover:transform hover:scale-[1.02] hover:-translate-y-0.5'
+                          ? 'bg-aws-50 border-aws-300 shadow-medium'
+                          : 'bg-white border-gray-200 hover:border-aws-200 hover:shadow-strong hover:bg-aws-50/30 hover:transform hover:scale-[1.02] hover:-translate-y-0.5'
                       }`}
                     >
                       <div className="flex items-start space-x-3">
                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-soft transition-all duration-300 hover:scale-105 ${
                           activeFile?.file_name === file.file_name 
-                            ? 'bg-indigo-600 text-white shadow-medium' 
-                            : 'bg-indigo-100 text-indigo-600 group-hover:bg-indigo-200 group-hover:text-indigo-700'
+                            ? 'bg-aws-600 text-white shadow-medium' 
+                            : 'bg-aws-100 text-aws-600 group-hover:bg-aws-200 group-hover:text-aws-700'
                         }`}>
                           <File className="w-5 h-5" />
                         </div>
@@ -3511,7 +2569,7 @@ const ChatPage: React.FC = () => {
                               {file.file_name}
                             </span>
                             {activeFile?.file_name === file.file_name && (
-                              <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce-subtle shadow-sm"></div>
+                              <div className="w-2 h-2 bg-aws-500 rounded-full animate-bounce-subtle shadow-sm"></div>
                             )}
                           </div>
                           {file.description && (
@@ -3526,7 +2584,7 @@ const ChatPage: React.FC = () => {
                               </span>
                             )}
                             {file.upload_time && (
-                              <span className="text-indigo-500 font-medium">
+                              <span className="text-aws-500 font-medium">
                                 {new Date(file.upload_time).toLocaleDateString('en-US', {
                                   month: 'short',
                                   day: 'numeric'
@@ -3537,22 +2595,8 @@ const ChatPage: React.FC = () => {
                         </div>
                         <div className="flex items-center space-x-2">
                           {settingActiveFile === file.file_name && (
-                            <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin shadow-sm"></div>
+                            <div className="w-5 h-5 border-2 border-aws-500 border-t-transparent rounded-full animate-spin shadow-sm"></div>
                           )}
-                          {loadingDatasetInfo && selectedDatasetInfo?.file_name === file.file_name && (
-                            <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin shadow-sm"></div>
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              getDatasetInfo(file.file_name);
-                            }}
-                            disabled={loadingDatasetInfo}
-                            className="opacity-0 group-hover:opacity-100 p-2 rounded-2xl transition-all duration-200 shadow-soft hover:bg-indigo-50 hover:text-indigo-600 hover:shadow-medium hover:scale-110"
-                            title="View dataset information"
-                          >
-                            <Info className="w-4 h-4" />
-                          </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -3589,7 +2633,7 @@ const ChatPage: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-8 w-full max-w-lg transform transition-all duration-300 scale-100">
             <div className="flex items-center justify-center mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <div className="w-16 h-16 bg-gradient-to-br from-aws-500 to-aws-600 rounded-2xl flex items-center justify-center shadow-lg">
                 <MessageSquare className="w-8 h-8 text-white" />
               </div>
             </div>
@@ -3631,7 +2675,7 @@ const ChatPage: React.FC = () => {
               <button
                 onClick={() => createNewSession(newSessionName)}
                 disabled={!newSessionName.trim()}
-                className="flex-1 px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:shadow-lg"
+                className="flex-1 px-6 py-4 bg-gradient-to-r from-aws-500 to-aws-600 hover:from-energy-600 hover:to-energy-700 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:shadow-lg"
               >
                 Create Session
               </button>
@@ -3642,30 +2686,53 @@ const ChatPage: React.FC = () => {
 
       {/* Upload File Modal */}
       {showUploadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Upload Dataset</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-8 w-full max-w-lg transform transition-all duration-300 scale-100">
+            <div className="flex items-center justify-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-aws-500 to-aws-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Upload className="w-8 h-8 text-white" />
+              </div>
+            </div>
             
-            <div className="space-y-4">
+            <div className="text-center mb-6">
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Upload Energy Dataset</h2>
+              <p className="text-gray-600 text-lg">Add your energy data files for analysis</p>
+            </div>
+            
+            <div className="space-y-6">
               {!selectedFile ? (
                 <div 
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full p-8 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:border-gray-400 transition-colors"
+                  className="w-full p-8 border-2 border-dashed border-aws-200 rounded-2xl text-center cursor-pointer hover:border-aws-400 hover:bg-aws-50 transition-all duration-200"
                 >
-                  <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-600">Click to select a file</p>
-                  <p className="text-sm text-gray-500 mt-1">CSV, JSON, TXT, etc.</p>
+                  <Upload className="w-10 h-10 text-aws-400 mx-auto mb-4" />
+                  <p className="text-gray-800 font-semibold mb-1">Click to select your energy dataset</p>
+                  <p className="text-sm text-gray-500">CSV, JSON, TXT, XLSX files supported</p>
                 </div>
               ) : (
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-aws-50 border border-aws-200 rounded-2xl">
                   <div className="flex items-center space-x-3">
-                    <File className="w-5 h-5 text-gray-600" />
-                    <div>
-                      <div className="font-medium text-gray-900">{selectedFile.name}</div>
-                      <div className="text-sm text-gray-500">
+                    <div className="w-10 h-10 bg-aws-500 rounded-lg flex items-center justify-center">
+                      <File className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-semibold text-gray-900">{selectedFile.name}</div>
+                      <div className="text-sm text-gray-600">
                         {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                       </div>
                     </div>
+                    <button
+                      onClick={() => {
+                        setSelectedFile(null);
+                        setFileName('');
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = '';
+                        }
+                      }}
+                      className="p-1 hover:bg-aws-100 rounded-lg transition-colors"
+                    >
+                      <X className="w-4 h-4 text-gray-500" />
+                    </button>
                   </div>
                 </div>
               )}
@@ -3684,31 +2751,26 @@ const ChatPage: React.FC = () => {
                 accept=".csv,.json,.txt,.xlsx,.xls"
               />
 
-              <input
-                type="text"
-                value={fileName}
-                onChange={(e) => setFileName(e.target.value)}
-                placeholder="Dataset name..."
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-              />
-
-              <textarea
-                value={fileDescription}
-                onChange={(e) => setFileDescription(e.target.value)}
-                placeholder="Description (optional)..."
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
-                rows={3}
-              />
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">Dataset Name</label>
+                <input
+                  type="text"
+                  value={fileName}
+                  onChange={(e) => setFileName(e.target.value)}
+                  placeholder="Enter a name for your dataset..."
+                  className="w-full px-4 py-4 bg-aws-50 border-2 border-aws-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-aws-500 focus:border-aws-400 transition-all shadow-sm hover:shadow-md text-gray-800 placeholder-gray-500"
+                />
+              </div>
 
               {uploadingFile && (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Uploading...</span>
-                    <span>{uploadProgress}%</span>
+                <div className="bg-aws-50 border border-aws-200 rounded-2xl p-4">
+                  <div className="flex justify-between items-center text-sm mb-2">
+                    <span className="text-gray-700 font-semibold">Uploading dataset...</span>
+                    <span className="text-aws-600 font-bold">{uploadProgress}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-aws-100 rounded-full h-3 overflow-hidden">
                     <div 
-                      className="bg-gray-900 h-2 rounded-full transition-all duration-300"
+                      className="bg-gradient-to-r from-aws-500 to-energy-600 h-3 rounded-full transition-all duration-300 ease-out"
                       style={{ width: `${uploadProgress}%` }}
                     ></div>
                   </div>
@@ -3716,30 +2778,31 @@ const ChatPage: React.FC = () => {
               )}
 
               {uploadError && (
-                <p className="text-red-600 text-sm">{uploadError}</p>
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                  <p className="text-red-700 text-sm font-semibold">{uploadError}</p>
+                </div>
               )}
             </div>
 
-            <div className="flex space-x-3 mt-6">
+            <div className="flex space-x-4 mt-8">
               <button
                 onClick={() => {
                   setShowUploadModal(false);
                   setSelectedFile(null);
                   setFileName('');
-                  setFileDescription('');
                   setUploadError('');
                 }}
                 disabled={uploadingFile}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                className="flex-1 px-6 py-4 border-2 border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all duration-300 shadow-sm hover:shadow-md disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={uploadFile}
                 disabled={!selectedFile || !fileName.trim() || uploadingFile}
-                className="flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 px-6 py-4 bg-gradient-to-r from-aws-500 to-aws-600 hover:from-energy-600 hover:to-energy-700 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:shadow-lg"
               >
-                {uploadingFile ? 'Uploading...' : 'Upload'}
+                {uploadingFile ? 'Uploading Dataset...' : 'Upload Dataset'}
               </button>
             </div>
           </div>
