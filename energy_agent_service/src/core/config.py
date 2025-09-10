@@ -87,6 +87,16 @@ class AnthropicModelConfig(BaseConfig):
     ANTHROPIC_API_KEY: str
 
 
+class ServicesConfig(BaseConfig):
+    """Configuration class for external service URLS.
+
+    Attributes:
+        Talk2DB: .
+    """
+
+    Talk2DB: str
+
+
 class Settings(BaseSettings):
     """
     Aggregated application settings class.
@@ -99,11 +109,13 @@ class Settings(BaseSettings):
         postgres: Database-related configuration.
         redis: Redis-related configuration.
         anthropic_model: Anthropic model API configuration.
+        services: .
     """
 
     anthropic_model: AnthropicModelConfig = AnthropicModelConfig()
     postgres: PostgresConfig = PostgresConfig()
     redis: RedisConfig = RedisConfig()
+    services: ServicesConfig = ServicesConfig()
 
 
 # Global settings instance for use throughout the application

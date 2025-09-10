@@ -1,5 +1,5 @@
 [project]
-name = "energy-agents-service"
+name = "energy-agent-service"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
