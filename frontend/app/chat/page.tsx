@@ -187,20 +187,13 @@ const ChatPage: React.FC = () => {
     try {
       console.log('🔄 Resending question:', lastUserMessage.content.substring(0, 50) + '...');
       
-      // Try streaming endpoint
-      const endpoint = '/stream';
-      let response = await fetch(`${apiEndpoints.chat}${endpoint}?question=${encodeURIComponent(lastUserMessage.content)}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
+      // Try new agent streaming endpoint with query parameter
+      let response = await fetch(`${apiEndpoints.agentStream}?question=${encodeURIComponent(lastUserMessage.content)}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `${localStorage.getItem('token_type')} ${localStorage.getItem('access_token')}`,
+        },
       });
-
-      // If that fails, try with trailing slash
-      if (!response.ok && (response.status === 404 || response.status === 405)) {
-        response = await fetch(`${apiEndpoints.chat}${endpoint}/?question=${encodeURIComponent(lastUserMessage.content)}`, {
-          method: 'GET',
-          headers: getAuthHeaders(),
-        });
-      }
 
       if (handleAuthError(response)) {
         setIsLoading(false);
@@ -215,6 +208,8 @@ const ChatPage: React.FC = () => {
         let currentContent = '';
         
         try {
+          let partialLine = ''; // Buffer for incomplete lines
+          
           while (true) {
             const { done, value } = await reader.read();
             if (done) {
@@ -242,8 +237,40 @@ const ChatPage: React.FC = () => {
               break;
             }
 
+            // Decode the chunk and handle SSE format
             const chunk = decoder.decode(value, { stream: true });
-            currentContent += chunk;
+            
+            // Handle partial lines from previous chunks
+            const chunkWithBuffer = partialLine + chunk;
+            const lines = chunkWithBuffer.split('\n');
+            
+            // Keep the last line as partial if it doesn't end with newline
+            partialLine = chunk.endsWith('\n') ? '' : lines.pop() || '';
+            
+            for (const line of lines) {
+              const trimmedLine = line.trim();
+              
+              if (trimmedLine.startsWith('data: ')) {
+                try {
+                  const jsonString = trimmedLine.substring(6).trim();
+                  const jsonData = JSON.parse(jsonString);
+                  
+                  if (jsonData.type === 'text') {
+                    currentContent += jsonData.data;
+                  } else if (jsonData.type === 'image') {
+                    // Handle image data - jsonData.data already contains the full data URI
+                    const imageData = jsonData.data;
+                    currentContent += `\n![Generated Image](${imageData})\n`;
+                  }
+                } catch (error) {
+                  // If JSON parsing fails, treat as plain text
+                  // Don't add the malformed JSON to content - just skip it
+                }
+              } else if (trimmedLine && !trimmedLine.startsWith('data: ')) {
+                // Handle plain text chunks that don't follow the data: format
+                currentContent += trimmedLine + '\n';
+              }
+            }
             
             // Update the single assistant message in real-time
             setMessages(prev => prev.map(msg => 
@@ -259,28 +286,16 @@ const ChatPage: React.FC = () => {
           throw readError;
         }
       } else {
-        // Fallback to regular chat endpoint
-        let fallbackResponse = await fetch(`${apiEndpoints.chat}?question=${encodeURIComponent(lastUserMessage.content)}`, {
-          method: 'GET',
-          headers: getAuthHeaders(),
-        });
-
-        if (!fallbackResponse.ok && (fallbackResponse.status === 404 || fallbackResponse.status === 405)) {
-          fallbackResponse = await fetch(`${apiEndpoints.chat}/?question=${encodeURIComponent(lastUserMessage.content)}`, {
-            method: 'GET',
-            headers: getAuthHeaders(),
-          });
-        }
-
-        if (fallbackResponse.ok) {
-          const contentType = fallbackResponse.headers.get('content-type');
+        // Handle non-streaming response from agent endpoint
+        if (response.ok) {
+          const contentType = response.headers.get('content-type');
           let content;
           
           if (contentType && contentType.includes('application/json')) {
-            const data = await fallbackResponse.json();
+            const data = await response.json();
             content = data.response || data.message || data.answer || JSON.stringify(data);
           } else {
-            content = await fallbackResponse.text();
+            content = await response.text();
           }
           
           setMessages(prev => prev.map(msg => 
@@ -519,15 +534,15 @@ const ChatPage: React.FC = () => {
       }
 
       // Check for images ![alt](data:image/...)
-      const imageMatch = trimmedLine.match(/^!\[([^\]]*)\]\(data:image\/[^;]+;base64,([^)]+)\)$/);
+      const imageMatch = trimmedLine.match(/^!\[([^\]]*)\]\((data:image\/[^)]+)\)$/);
       if (imageMatch) {
         const altText = imageMatch[1] || 'Generated Image';
-        const base64Data = imageMatch[2];
+        const dataUri = imageMatch[2]; // This is already the complete data URI
         
         elements.push(
           <div key={currentIndex++} className="my-6">
             <img
-              src={`data:image/png;base64,${base64Data}`}
+              src={dataUri}
               alt={altText}
               className="w-full max-h-[600px] min-h-[400px] rounded-lg shadow-lg border border-gray-200"
               style={{ objectFit: 'contain' }}
@@ -934,8 +949,8 @@ const ChatPage: React.FC = () => {
           if (jsonData.type === 'text') {
             cleanedContent += jsonData.data;
           } else if (jsonData.type === 'image') {
-            // Convert image data back to markdown format
-            cleanedContent += `\n![Generated Image](data:image/png;base64,${jsonData.data})\n`;
+            // Handle image data - jsonData.data already contains the full data URI
+            cleanedContent += `\n![Generated Image](${jsonData.data})\n`;
           }
         } catch (error) {
           // If JSON parsing fails, treat as plain text
@@ -977,8 +992,8 @@ const ChatPage: React.FC = () => {
               if (jsonData.type === 'text') {
                 cleanedContent += jsonData.data;
               } else if (jsonData.type === 'image') {
-                // Convert image data back to markdown format
-                cleanedContent += `\n![Generated Image](data:image/png;base64,${jsonData.data})\n`;
+                // Handle image data - jsonData.data already contains the full data URI
+                cleanedContent += `\n![Generated Image](${jsonData.data})\n`;
               }
             } catch (error) {
               // If JSON parsing fails, treat as plain text
@@ -1172,11 +1187,11 @@ const ChatPage: React.FC = () => {
       }
     } catch (error) {
       console.error('❌ Error loading chat history:', error);
-      console.log('🔧 Possible issues: 1) API gateway not running on port 8003, 2) Not authenticated, 3) No active session/file');
+      console.log('🔧 Possible issues: 1) API not running on port 8000, 2) Not authenticated, 3) No active session/file');
       
       // Try to provide helpful debugging info
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.log('🚨 Network error - API gateway may not be running');
+        console.log('🚨 Network error - API may not be running');
       }
       
       console.log('📝 Showing empty chat due to chat history service error');
@@ -1241,14 +1256,14 @@ const ChatPage: React.FC = () => {
       console.log(`Getting active file for session: ${currentSession.title}`);
       
       // Try the files/active endpoint first
-      let response = await fetch(`${apiEndpoints.files}/active`, {
+      let response = await fetch(`${apiEndpoints.files}/active/${currentSession.id}`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
 
       // If that fails with 405 or 404, try alternative approaches
       if (!response.ok && (response.status === 405 || response.status === 404)) {
-        console.log(`GET /files/active failed with ${response.status}, trying alternative...`);
+        console.log(`GET /files/active/${currentSession.id} failed with ${response.status}, trying alternative...`);
         
         // Clear active file state since we can't retrieve it
         setActiveFile(null);
@@ -1282,8 +1297,8 @@ const ChatPage: React.FC = () => {
     setSettingActiveFile(fileName);
     
     try {
-      // Try with trailing slash first (as documented)
-      let response = await fetch(`${apiEndpoints.files}/active/`, {
+      // Try with session ID in path
+      let response = await fetch(`${apiEndpoints.files}/active/${currentSession?.id}`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -1293,8 +1308,8 @@ const ChatPage: React.FC = () => {
 
       // If that fails with 405, try without trailing slash
       if (!response.ok && response.status === 405) {
-        console.log('POST /files/active/ failed with 405, trying without trailing slash...');
-        response = await fetch(`${apiEndpoints.files}/active`, {
+        console.log('POST /files/active/{session} failed with 405, trying fallback...');
+        response = await fetch(`${apiEndpoints.files}/active/${currentSession?.id}`, {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify({
@@ -1367,7 +1382,7 @@ const ChatPage: React.FC = () => {
       const formData = new FormData();
       formData.append('file', selectedFile);
       formData.append('file_name', fileName.trim());
-      formData.append('description', '');
+      formData.append('session_id', currentSession?.id || '00000000-0000-0000-0000-000000000000');
 
       const response = await fetch(apiEndpoints.files, {
         method: 'POST',
@@ -1544,7 +1559,7 @@ const ChatPage: React.FC = () => {
 
     setDeletingSession(true);
     try {
-      // Based on UI requirements: DELETE to /api/v1/gateway/sessions/{title}
+      // Based on UI requirements: DELETE to /api/v1/sessions/{title}
       const response = await fetch(`${apiEndpoints.sessions}/${sessionToDelete.title}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
@@ -1632,7 +1647,7 @@ const ChatPage: React.FC = () => {
 
     setDeletingFile(true);
     try {
-      // Based on UI requirements: DELETE to /api/v1/gateway/files/{file_name}
+      // Based on UI requirements: DELETE to /api/v1/files/{file_name}
       const response = await fetch(`${apiEndpoints.files}/${fileToDelete.file_name}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
@@ -1688,25 +1703,16 @@ const ChatPage: React.FC = () => {
     try {
       console.log('🚀 Starting streaming request for question:', currentQuestion.substring(0, 50) + '...');
       if (DEBUG_STREAMING) {
-        const endpoint = '/stream';
-        console.log('Starting streaming request to:', `${apiEndpoints.chat}${endpoint}?question=${encodeURIComponent(currentQuestion)}`);
+        console.log('Starting streaming request to:', apiEndpoints.agentStream);
       }
       
-      // Try streaming endpoint - first without trailing slash
-      const endpoint = '/stream';
-      let response = await fetch(`${apiEndpoints.chat}${endpoint}?question=${encodeURIComponent(currentQuestion)}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
+      // Use new agent streaming endpoint with POST and query parameter
+      let response = await fetch(`${apiEndpoints.agentStream}?question=${encodeURIComponent(currentQuestion)}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `${localStorage.getItem('token_type')} ${localStorage.getItem('access_token')}`,
+        },
       });
-
-      // If that fails, try with trailing slash
-      if (!response.ok && (response.status === 404 || response.status === 405)) {
-        console.log(`Streaming endpoint failed with ${response.status}, trying with trailing slash...`);
-        response = await fetch(`${apiEndpoints.chat}${endpoint}/?question=${encodeURIComponent(currentQuestion)}`, {
-          method: 'GET',
-          headers: getAuthHeaders(),
-        });
-      }
 
       if (DEBUG_STREAMING) {
         console.log('Stream response status:', response.status, 'OK:', response.ok);
@@ -1798,10 +1804,11 @@ const ChatPage: React.FC = () => {
                       console.log(`📝 Added text:`, jsonData.data.substring(0, 50));
                     }
                   } else if (jsonData.type === 'image') {
-                    // Add image as a special marker in the content
-                    currentContent += `\n![Generated Image](data:image/png;base64,${jsonData.data})\n`;
+                    // Handle image data - jsonData.data already contains the full data URI
+                    const imageData = jsonData.data;
+                    currentContent += `\n![Generated Image](${imageData})\n`;
                     if (DEBUG_STREAMING) {
-                      console.log(`🖼️ Added image, base64 length:`, jsonData.data.length);
+                      console.log(`🖼️ Added image with data URI, length:`, imageData.length);
                     }
                   }
                 } catch (error) {
@@ -1838,31 +1845,18 @@ const ChatPage: React.FC = () => {
           throw readError;
         }
       } else {
-        // Fallback to regular chat endpoint
-        console.log(`❌ Streaming failed with status ${response.status}, falling back to regular chat endpoint`);
-        let fallbackResponse = await fetch(`${apiEndpoints.chat}?question=${encodeURIComponent(currentQuestion)}`, {
-          method: 'GET',
-          headers: getAuthHeaders(),
-        });
+        // Handle non-streaming response from agent endpoint
+        console.log(`❌ Streaming failed with status ${response.status}, handling as non-streaming response`);
 
-        // If that fails, try with trailing slash
-        if (!fallbackResponse.ok && (fallbackResponse.status === 404 || fallbackResponse.status === 405)) {
-          console.log('Regular chat endpoint failed, trying with trailing slash...');
-          fallbackResponse = await fetch(`${apiEndpoints.chat}/?question=${encodeURIComponent(currentQuestion)}`, {
-            method: 'GET',
-            headers: getAuthHeaders(),
-          });
-        }
-
-        if (fallbackResponse.ok) {
-          const contentType = fallbackResponse.headers.get('content-type');
+        if (response.ok) {
+          const contentType = response.headers.get('content-type');
           let content;
           
           if (contentType && contentType.includes('application/json')) {
-            const data = await fallbackResponse.json();
+            const data = await response.json();
             content = data.response || data.message || data.answer || JSON.stringify(data);
           } else {
-            content = await fallbackResponse.text();
+            content = await response.text();
           }
           
           // Update the existing assistant message with fallback content

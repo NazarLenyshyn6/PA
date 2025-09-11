@@ -19,9 +19,11 @@ const DashboardPage: React.FC = () => {
     setIsUploading(true);
     const formData = new FormData();
     formData.append('file', selectedFile);
+    formData.append('file_name', selectedFile.name);
+    formData.append('session_id', '00000000-0000-0000-0000-000000000000'); // Default session ID for dashboard uploads
 
     try {
-      const response = await fetch('http://localhost:8003/api/v1/gateway/files', {
+      const response = await fetch('http://localhost:8000/api/v1/files', {
         method: 'POST',
         body: formData,
       });

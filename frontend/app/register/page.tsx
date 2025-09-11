@@ -36,7 +36,7 @@ const RegisterPage: React.FC = () => {
   const performAutoLogin = async (email: string, password: string) => {
     setIsLoggingIn(true);
     try {
-      const response = await fetch('http://localhost:8003/api/v1/gateway/auth/login', {
+      const response = await fetch('http://localhost:8000/api/v1/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -87,7 +87,7 @@ const RegisterPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8003/api/v1/gateway/auth/register', {
+      const response = await fetch('http://localhost:8000/api/v1/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

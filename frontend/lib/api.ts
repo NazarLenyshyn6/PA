@@ -1,14 +1,17 @@
-const API_BASE_URL = 'http://localhost:8003';
+const API_BASE_URL = 'http://localhost:8000';
 
 export const apiEndpoints = {
-  login: `${API_BASE_URL}/api/v1/gateway/auth/login`,
-  register: `${API_BASE_URL}/api/v1/gateway/auth/register`,
-  files: `${API_BASE_URL}/api/v1/gateway/files`,
-  fileUpload: `${API_BASE_URL}/api/v1/gateway/files`,
-  sessions: `${API_BASE_URL}/api/v1/gateway/sessions`,
-  chat: `${API_BASE_URL}/api/v1/gateway/chat`,
-  chatSave: `${API_BASE_URL}/api/v1/gateway/chat/save`,
-  chatHistory: `${API_BASE_URL}/api/v1/gateway/chat/history`,
+  login: `${API_BASE_URL}/api/v1/auth/login`,
+  register: `${API_BASE_URL}/api/v1/auth/register`,
+  files: `${API_BASE_URL}/api/v1/files`,
+  fileUpload: `${API_BASE_URL}/api/v1/files`,
+  sessions: `${API_BASE_URL}/api/v1/sessions`,
+  // Agent endpoint - streaming chat
+  agentStream: `${API_BASE_URL}/api/v1/agent/stream`,
+  // Note: Legacy chat endpoints below don't exist in current energy_agent backend
+  chat: `${API_BASE_URL}/api/v1/chat`,
+  chatSave: `${API_BASE_URL}/api/v1/chat/save`,
+  chatHistory: `${API_BASE_URL}/api/v1/chat/history`,
 };
 
 export const getAuthHeaders = () => {
