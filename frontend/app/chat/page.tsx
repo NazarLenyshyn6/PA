@@ -258,8 +258,8 @@ const ChatPage: React.FC = () => {
                   if (jsonData.type === 'text') {
                     currentContent += jsonData.data;
                   } else if (jsonData.type === 'image') {
-                    // Handle image data - jsonData.data already contains the full data URI
-                    const imageData = jsonData.data;
+                    // Handle image data - convert base64 to data URI if needed
+                    const imageData = jsonData.data.startsWith('data:') ? jsonData.data : `data:image/png;base64,${jsonData.data}`;
                     currentContent += `\n![Generated Image](${imageData})\n`;
                   }
                 } catch (error) {
@@ -949,8 +949,9 @@ const ChatPage: React.FC = () => {
           if (jsonData.type === 'text') {
             cleanedContent += jsonData.data;
           } else if (jsonData.type === 'image') {
-            // Handle image data - jsonData.data already contains the full data URI
-            cleanedContent += `\n![Generated Image](${jsonData.data})\n`;
+            // Handle image data - convert base64 to data URI if needed
+            const imageData = jsonData.data.startsWith('data:') ? jsonData.data : `data:image/png;base64,${jsonData.data}`;
+            cleanedContent += `\n![Generated Image](${imageData})\n`;
           }
         } catch (error) {
           // If JSON parsing fails, treat as plain text
@@ -992,8 +993,9 @@ const ChatPage: React.FC = () => {
               if (jsonData.type === 'text') {
                 cleanedContent += jsonData.data;
               } else if (jsonData.type === 'image') {
-                // Handle image data - jsonData.data already contains the full data URI
-                cleanedContent += `\n![Generated Image](${jsonData.data})\n`;
+                // Handle image data - convert base64 to data URI if needed
+                const imageData = jsonData.data.startsWith('data:') ? jsonData.data : `data:image/png;base64,${jsonData.data}`;
+                cleanedContent += `\n![Generated Image](${imageData})\n`;
               }
             } catch (error) {
               // If JSON parsing fails, treat as plain text
@@ -1804,8 +1806,8 @@ const ChatPage: React.FC = () => {
                       console.log(`📝 Added text:`, jsonData.data.substring(0, 50));
                     }
                   } else if (jsonData.type === 'image') {
-                    // Handle image data - jsonData.data already contains the full data URI
-                    const imageData = jsonData.data;
+                    // Handle image data - convert base64 to data URI if needed
+                    const imageData = jsonData.data.startsWith('data:') ? jsonData.data : `data:image/png;base64,${jsonData.data}`;
                     currentContent += `\n![Generated Image](${imageData})\n`;
                     if (DEBUG_STREAMING) {
                       console.log(`🖼️ Added image with data URI, length:`, imageData.length);

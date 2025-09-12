@@ -90,6 +90,7 @@ class ExternalServicesConfig(BaseConfig):
     """
 
     Talk2DB: str
+    MLAgent: str
 
 
 class Settings(BaseSettings):

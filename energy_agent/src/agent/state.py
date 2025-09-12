@@ -9,4 +9,5 @@ class AgentState(TypedDict):
     """..."""
 
     question: str
+    storage_uri: str
     tool_call_message: AIMessage
