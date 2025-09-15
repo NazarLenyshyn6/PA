@@ -14,8 +14,10 @@ from agent.state import AgentState
 @tool
 async def ml_agent(state: Annotated[AgentState, InjectedToolArg]):
     """
-    Use this tool when the user asks any question related to machine learning and data visualization, it stays top priority for analysis and visualization tasks.
-    It is responsible for handling requests to analyze, visualize and predict data.
+    Use this tool for all machine learning, data analysis, prediction, and visualization tasks.
+
+    - Stays top priority for analysis, ML, and visualization questions.
+    - Handles requests to analyze datasets, generate plots, make predictions, or perform statistical analysis.
     """
 
     # Load data

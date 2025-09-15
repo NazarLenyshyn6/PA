@@ -85,6 +85,7 @@ For forecasting/modeling requests, produce these explicit steps:
    - Evaluate with `performance_metrics` and report metrics (RMSE, MAE, MAPE, sMAPE, WAPE, optionally coverage).
    - **Select hyperparameter ranges wisely** to avoid excessively long training times—prioritize reasonable ranges over exhaustive grids to keep wait times short.
    - Select best config by primary metric (state which) with secondary tie-breaker.
+   - Model training must not last long, so select as little hyparparaters options as possible, it is VERY IMPORTNANT RULE, so user does not wait to long for model training.
 
 4) **Refit Best Prophet (Mandatory)**
    - Refit on full train (train+val if acceptable) with selected params.

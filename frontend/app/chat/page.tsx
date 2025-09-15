@@ -2,14 +2,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2, Info, Save, ChevronDown, ChevronRight, Move, Maximize2, Minimize2, RefreshCw, BookOpen, Download } from 'lucide-react';
+import { Send, Plus, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, Trash2, Info, ChevronDown, ChevronRight, Move, Maximize2, Minimize2, RefreshCw, BookOpen, Download, X } from 'lucide-react';
 import { apiEndpoints, getAuthHeaders } from '@/lib/api';
 
-interface Session {
-  id: string;
-  title: string;
-  created_at: string;
-}
 
 interface Message {
   id: string;
@@ -36,16 +31,10 @@ interface FileItem {
 
 const ChatPage: React.FC = () => {
   const router = useRouter();
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
-  const [showNewSessionModal, setShowNewSessionModal] = useState(false);
-  const [newSessionName, setNewSessionName] = useState('');
-  const [newSessionError, setNewSessionError] = useState('');
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -53,10 +42,10 @@ const ChatPage: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState('');
+  const [fileDescription, setFileDescription] = useState('');
   const [uploadError, setUploadError] = useState('');
   const [settingActiveFile, setSettingActiveFile] = useState<string | null>(null);
   const [activeFile, setActiveFile] = useState<FileItem | null>(null);
-  const [sessionActiveFiles, setSessionActiveFiles] = useState<{[sessionId: string]: string | null}>({});
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [copiedMessage, setCopiedMessage] = useState<string | null>(null);
   const [collapsedCodeBlocks, setCollapsedCodeBlocks] = useState<Set<string>>(new Set());
@@ -64,15 +53,10 @@ const ChatPage: React.FC = () => {
   const [streamingMessage, setStreamingMessage] = useState('');
   const [lastChunkTime, setLastChunkTime] = useState<number>(0);
   const [currentStreamingMessageId, setCurrentStreamingMessageId] = useState<string | null>(null);
-  const [showDeleteSessionModal, setShowDeleteSessionModal] = useState(false);
-  const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
   const [showDeleteFileModal, setShowDeleteFileModal] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<FileItem | null>(null);
-  const [deletingSession, setDeletingSession] = useState(false);
   const [deletingFile, setDeletingFile] = useState(false);
   const [loadingDatasetInfo, setLoadingDatasetInfo] = useState(false);
-  const [savingConversation, setSavingConversation] = useState(false);
-  const [saveMessage, setSaveMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -88,12 +72,9 @@ const ChatPage: React.FC = () => {
       // Clear all localStorage data
       localStorage.removeItem('access_token');
       localStorage.removeItem('token_type');
-      localStorage.removeItem('activeSessionId');
       localStorage.removeItem('activeSessionTitle');
       
       // Clear all state
-      setSessions([]);
-      setCurrentSession(null);
       setMessages([]);
       setFiles([]);
       setActiveFile(null);
@@ -1015,33 +996,11 @@ const ChatPage: React.FC = () => {
     return String(answer || '');
   };
 
-  // Load messages for a session
+  // Load messages for a session (no backend - maintain UI compatibility)
   const loadMessages = useCallback(async (sessionId: string) => {
-    try {
-      const response = await fetch(`${apiEndpoints.sessions}/${sessionId}/messages`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        // Parse historical messages to clean up JSON data format
-        const cleanedMessages = data.map((message: Message) => ({
-          ...message,
-          content: message.role === 'assistant' ? parseHistoricalMessage(message.content) : message.content
-        }));
-        setMessages(cleanedMessages);
-      } else if (response.status === 404) {
-        console.log(`Messages endpoint not found for session ${sessionId}, starting with empty messages`);
-        setMessages([]);
-      } else {
-        console.error(`Failed to load messages, status: ${response.status}`);
-        setMessages([]);
-      }
-    } catch (error) {
-      console.error('Error loading messages:', error);
-      setMessages([]);
-    }
+    // No backend endpoint exists, just start with empty messages
+    console.log(`No session persistence - starting with empty messages for session ${sessionId}`);
+    setMessages([]);
   }, []);
 
   // Load chat history from chat history service
@@ -1049,185 +1008,30 @@ const ChatPage: React.FC = () => {
     try {
       // Clear existing messages immediately to show loading state
       setMessages([]);
-      
+
       // Get current values at time of call
-      const sessionInfo = { sessionId: currentSession?.id, sessionTitle: currentSession?.title };
+      // No sessions - just logging for consistency
       const activeFileName = activeFile?.file_name || 'None';
-      
-      console.log('🔍 TRIGGERING CHAT HISTORY ENDPOINT:', apiEndpoints.chatHistory);
-      console.log('📤 Expected response format: [{"question": "...", "answer": "..."}]');
-      console.log('📋 Current session info:', sessionInfo);
+
+      console.log('📝 No chat history API - starting with empty conversation');
       console.log('📁 Active file:', activeFileName);
-      
-      // TEST MODE: Set this to true to test with sample data without backend
-      const TEST_MODE = false;
-      if (TEST_MODE) {
-        const testChatHistory = [
-          {
-            "question": "check data types",
-            "answer": "I'll help you check the data types in your dataset. This is a fundamental step in understanding your data structure and ensuring proper analysis.\n\nHere's how to examine the data types systematically:\n\n**Step 1: Get Overall Data Type Summary**\nUse the `.dtypes` attribute to display all column data types at once. This gives you a quick overview of what you're working with - whether columns are integers, floats, objects (strings), booleans, or datetime types.\n\n___\n\n**Step 2: Get Detailed Information**\nUse the `.info()` method to get comprehensive details including:\n- Column names and their positions\n- Non-null count for each column\n- Data type for each column  \n- Memory usage of the dataset\n- Total number of entries\n\n```python\nimport pandas as pd\nimport numpy as np\n\n# Step 1: Get Overall Data Type Summary\ndtypes_summary = df.dtypes\nprint(\"Data Types Overview:\")\nprint(dtypes_summary)\n\n# Step 2: Get Detailed Information\nprint(\"\\nDetailed Dataset Information:\")\ndf.info(memory_usage='deep')\n```\n\n# Data Types Analysis: Technical Deep Dive\n\n## **Dataset Structure Overview**\n\nThe analysis reveals a **Netflix-style streaming dataset** with 200 entries across 12 columns, consuming approximately 188KB of memory. The data structure is heavily skewed toward textual content, with **11 object-type columns** and only **1 integer column** (`release_year`).\n\n**Memory footprint**: ~940 bytes per row, which suggests room for optimization through strategic type conversions."
-          },
-          {
-            "question": "show me the first 5 rows",
-            "answer": "I'll display the first 5 rows of your dataset to give you a quick overview of the data structure and content.\n\n```python\n# Display first 5 rows\nfirst_5_rows = df.head(5)\nprint(\"First 5 rows of the dataset:\")\nprint(first_5_rows)\n```\n\nHere are the first 5 rows of your dataset:\n\n| show_id | type | title | director | cast | country |\n|---------|------|--------|----------|------|----------|\n| s1 | Movie | Dick Johnson Is Dead | Kirsten Johnson | NaN | United States |\n| s2 | Movie | Blood & Water | NaN | Ama Qamata, Khosi Ngema | South Africa |\n| s3 | TV Show | Ganglands | Julien Leclercq | Sami Bouajila, Tracy Gotoas | NaN |\n| s4 | TV Show | Jailbirds New Orleans | NaN | NaN | NaN |\n| s5 | Movie | Kota Factory | NaN | Mayur More, Jitendra Kumar | India |\n\nThis gives you a clear view of:\n- **Content types**: Mix of Movies and TV Shows\n- **Missing values**: Several NaN entries in director, cast, and country columns\n- **Data variety**: International content from multiple countries\n- **Text-heavy content**: Rich metadata with titles, names, and descriptions"
-          }
-        ];
-        console.log('🧪 TEST MODE: Using sample chat history');
-        
-        // Process test data directly
-        const messages: Message[] = [];
-        testChatHistory.forEach((item, index) => {
-          const baseId = Date.now() + index * 2;
-          const currentTime = new Date();
-          
-          messages.push({
-            id: `${baseId}`,
-            content: item.question,
-            role: 'user',
-            timestamp: new Date(currentTime.getTime() + index * 2).toISOString(),
-          });
-          
-          messages.push({
-            id: `${baseId + 1}`,
-            content: item.answer,
-            role: 'assistant',
-            timestamp: new Date(currentTime.getTime() + index * 2 + 1).toISOString(),
-          });
-        });
-        
-        setMessages(messages);
-        console.log(`✅ TEST MODE: Successfully loaded ${messages.length} messages`);
-        return;
-      }
-      
-      // Gateway handles all parameter extraction from token automatically
-      // Just need to ensure user is authenticated and has active session/file
-      const currentState = { 
-        hasSession: !!currentSession,
-        sessionTitle: currentSession?.title,
-        hasActiveFile: !!activeFile,
-        fileName: activeFile?.file_name,
-        isAuthenticated: !!localStorage.getItem('access_token')
-      };
-      console.log('📋 Current state:', currentState);
 
-      const response = await fetch(apiEndpoints.chatHistory, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
-
-      console.log('📡 Response status:', response.status, 'OK:', response.ok);
-      
-      if (response.ok) {
-        const chatHistory: ChatHistoryItem[] = await response.json();
-        console.log('📖 Raw chat history response:', JSON.stringify(chatHistory, null, 2));
-        
-        // Validate that the response is an array of objects with question/answer format
-        if (chatHistory && Array.isArray(chatHistory) && chatHistory.length > 0) {
-          // Validate each item has the expected format (answer can be string or array)
-          const isValidFormat = chatHistory.every(item => 
-            item && 
-            typeof item === 'object' && 
-            typeof item.question === 'string' && 
-            (typeof item.answer === 'string' || Array.isArray(item.answer))
-          );
-          
-          if (!isValidFormat) {
-            console.warn('⚠️ Backend response format validation failed - some items missing question/answer fields');
-            console.log('📋 Expected: [{"question": "...", "answer": "..." | ["..."]}]');
-            console.log('📋 Received:', chatHistory);
-          }
-          // Convert chat history to dialog format: questions on RIGHT (user), answers on LEFT (assistant)
-          const messages: Message[] = [];
-          chatHistory.forEach((item, index) => {
-            // Skip invalid items but continue processing (answer can be string or array)
-            if (!item || typeof item.question !== 'string' || 
-                (typeof item.answer !== 'string' && !Array.isArray(item.answer))) {
-              console.warn(`⚠️ Skipping invalid chat history item at index ${index}:`, item);
-              return;
-            }
-            
-            const baseId = Date.now() + index * 2;
-            const currentTime = new Date();
-            
-            // Clean up escaped quotes and normalize content
-            const cleanQuestion = item.question.replace(/\\'/g, "'").replace(/\\"/g, '"');
-            const cleanAnswer = parseAnswerContent(item.answer);
-            
-            // Add user question (will appear on RIGHT side)
-            messages.push({
-              id: `${baseId}`,
-              content: cleanQuestion,
-              role: 'user',
-              timestamp: new Date(currentTime.getTime() + index * 2).toISOString(),
-            });
-            
-            // Add assistant answer (will appear on LEFT side)
-            messages.push({
-              id: `${baseId + 1}`,
-              content: cleanAnswer,
-              role: 'assistant',
-              timestamp: new Date(currentTime.getTime() + index * 2 + 1).toISOString(),
-            });
-          });
-          
-          setMessages(messages);
-          console.log(`✅ Successfully converted ${chatHistory.length} chat history items to ${messages.length} dialog messages`);
-          console.log('💬 Chat history recreated: Questions on RIGHT (user), Answers on LEFT (assistant)');
-          console.log(`📋 Sample format - Question: "${chatHistory[0].question.substring(0, 30)}..." Answer: "${String(chatHistory[0].answer).substring(0, 30)}..."`);
-          console.log(`📁 Chat history loaded for file: ${activeFileName}`);
-        } else {
-          console.log('📝 No previous conversation history found - showing empty chat (like new session)');
-          console.log('📋 Response data was:', chatHistory);
-          setMessages([]);
-        }
-      } else {
-        const errorText = await response.text().catch(() => 'No error details');
-        console.log(`⚠️ Chat history service responded with status ${response.status}`);
-        console.log(`📝 Error response body:`, errorText);
-        setMessages([]);
-      }
+      // Always start with empty messages since chat history API doesn't exist
+      setMessages([]);
+      console.log('✅ Chat initialized with empty conversation');
     } catch (error) {
-      console.error('❌ Error loading chat history:', error);
-      console.log('🔧 Possible issues: 1) API not running on port 8000, 2) Not authenticated, 3) No active session/file');
-      
-      // Try to provide helpful debugging info
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.log('🚨 Network error - API may not be running');
-      }
-      
-      console.log('📝 Showing empty chat due to chat history service error');
+      console.error('❌ Error initializing chat:', error);
       setMessages([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array - only call manually, access current values from closure
 
-  // Load sessions from API
-  const loadSessions = useCallback(async () => {
-    try {
-      const response = await fetch(apiEndpoints.sessions, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
-
-      if (handleAuthError(response)) return;
-
-      if (response.ok) {
-        const data = await response.json();
-        setSessions(data);
-      } else {
-        console.error('Failed to load sessions');
-      }
-    } catch (error) {
-      console.error('Error loading sessions:', error);
-    }
-  }, [handleAuthError]);
 
   // Load files from API
   const loadFiles = useCallback(async () => {
     setLoadingFiles(true);
     try {
-      const response = await fetch(apiEndpoints.files, {
+      const response = await fetch(apiEndpoints.filesMetadata, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
@@ -1249,120 +1053,26 @@ const ChatPage: React.FC = () => {
 
   // Get active file for current session
   const getActiveFile = useCallback(async () => {
-    if (!currentSession) {
-      setActiveFile(null);
-      return;
-    }
+    // No backend persistence for active files - just maintain UI state
+    // User can manually select files from the files list in the UI
+    console.log('No active file persistence - files shown in sidebar are all available');
+  }, []);
 
-    try {
-      console.log(`Getting active file for session: ${currentSession.title}`);
-      
-      // Try the files/active endpoint first
-      let response = await fetch(`${apiEndpoints.files}/active/${currentSession.id}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
-
-      // If that fails with 405 or 404, try alternative approaches
-      if (!response.ok && (response.status === 405 || response.status === 404)) {
-        console.log(`GET /files/active/${currentSession.id} failed with ${response.status}, trying alternative...`);
-        
-        // Clear active file state since we can't retrieve it
-        setActiveFile(null);
-        console.log(`Cleared active file for session ${currentSession.title} due to endpoint unavailability`);
-        return;
-      }
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Active file response:', data);
-        
-        // Set active file state for current session only
-        setActiveFile(data);
-        console.log(`Updated active file for current session ${currentSession.title}: ${data?.file_name || 'None'}`);
-        
-      } else {
-        console.log(`Failed to get active file, status: ${response.status}`);
-        setActiveFile(null);
-        console.log(`Cleared active file for session ${currentSession.title}`);
-      }
-    } catch (error) {
-      console.error('Error getting active file:', error);
-      setActiveFile(null);
-    }
-  }, [currentSession]);
-
-  // Set active file for current session
+  // Set active file (no sessions - all files available)
   const setActiveFileForSession = async (fileName: string) => {
-    if (!currentSession || settingActiveFile === fileName) return;
+    if (settingActiveFile === fileName) return;
 
     setSettingActiveFile(fileName);
-    
+
     try {
-      // Try with session ID in path
-      let response = await fetch(`${apiEndpoints.files}/active/${currentSession?.id}`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          file_name: fileName,
-        }),
-      });
-
-      // If that fails with 405, try without trailing slash
-      if (!response.ok && response.status === 405) {
-        console.log('POST /files/active/{session} failed with 405, trying fallback...');
-        response = await fetch(`${apiEndpoints.files}/active/${currentSession?.id}`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            file_name: fileName,
-          }),
-        });
-      }
-
-      if (response.ok) {
-        // Immediately update the active file for visual feedback
-        const selectedFile = files.find(f => f.file_name === fileName);
-        if (selectedFile) {
-          setActiveFile(selectedFile);
-        }
-        // The active file state is already updated above for immediate visual feedback
-        await loadFiles();
-        await getActiveFile();
-        
-        // IMPORTANT: Load chat history for this file when it becomes active
-        console.log(`📂 File ${fileName} is now active - loading chat history`);
-        await loadChatHistory();
-        
-        console.log(`Successfully set ${fileName} as active file for session ${currentSession.title}`);
-      } else {
-        console.error(`Failed to set active file, status: ${response.status}`);
-        // Still update the UI optimistically
-        const selectedFile = files.find(f => f.file_name === fileName);
-        if (selectedFile) {
-          setActiveFile(selectedFile);
-          console.log(`Set active file locally despite API failure: ${fileName}`);
-          
-          // Load chat history even if API failed
-          console.log(`📂 File ${fileName} set locally - loading chat history`);
-          await loadChatHistory();
-        }
-      }
-    } catch (error) {
-      console.error('Error setting active file:', error);
-      // Still update the UI optimistically
+      // No backend call needed - just set the file as active in UI
       const selectedFile = files.find(f => f.file_name === fileName);
       if (selectedFile) {
         setActiveFile(selectedFile);
-        console.log(`Set active file locally due to network error: ${fileName}`);
-        
-        // Load chat history even on network error
-        try {
-          console.log(`📂 File ${fileName} set locally (network error) - loading chat history`);
-          await loadChatHistory();
-        } catch (historyError) {
-          console.error('Failed to load chat history after network error:', historyError);
-        }
+        console.log(`📂 Selected file: ${fileName} (all files available)`);
+
+        // Load chat history for visual consistency (even though it's empty)
+        await loadChatHistory();
       }
     } finally {
       setSettingActiveFile(null);
@@ -1371,8 +1081,8 @@ const ChatPage: React.FC = () => {
 
   // Upload file function
   const uploadFile = async () => {
-    if (!selectedFile || !fileName.trim()) {
-      setUploadError('Please select a file and provide a name');
+    if (!selectedFile || !fileName.trim() || !fileDescription.trim()) {
+      setUploadError('Please select a file and provide both name and description');
       return;
     }
 
@@ -1384,7 +1094,7 @@ const ChatPage: React.FC = () => {
       const formData = new FormData();
       formData.append('file', selectedFile);
       formData.append('file_name', fileName.trim());
-      formData.append('session_id', currentSession?.id || '00000000-0000-0000-0000-000000000000');
+      formData.append('file_description', fileDescription.trim());
 
       const response = await fetch(apiEndpoints.files, {
         method: 'POST',
@@ -1396,17 +1106,22 @@ const ChatPage: React.FC = () => {
 
       if (response.ok) {
         await loadFiles();
-        // Automatically set the uploaded file as active for current session
-        if (currentSession) {
-          await setActiveFileForSession(fileName.trim());
-        }
+        // Automatically set the uploaded file as active
+        await setActiveFileForSession(fileName.trim());
         setShowUploadModal(false);
         setSelectedFile(null);
         setFileName('');
+        setFileDescription('');
         setUploadProgress(100);
       } else {
         const errorData = await response.json().catch(() => ({}));
-        setUploadError(errorData.detail || 'Failed to upload file. Please try again.');
+        // Ensure error is always a string
+        const errorMessage = typeof errorData.detail === 'string'
+          ? errorData.detail
+          : typeof errorData.detail === 'object'
+            ? JSON.stringify(errorData.detail)
+            : 'Failed to upload file. Please try again.';
+        setUploadError(errorMessage);
       }
     } catch (error) {
       console.error('Error uploading file:', error);
@@ -1417,221 +1132,9 @@ const ChatPage: React.FC = () => {
     }
   };
 
-  // Create new session
-  const createNewSession = async (sessionName: string) => {
-    if (!sessionName.trim()) {
-      setNewSessionError('Session name is required');
-      return;
-    }
-
-    setNewSessionError('');
-
-    try {
-      const response = await fetch(apiEndpoints.sessions, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          title: sessionName.trim(),
-        }),
-      });
-
-      if (response.ok) {
-        const newSession = await response.json();
-        setSessions(prev => [newSession, ...prev]);
-        setCurrentSession(newSession);
-        setMessages([]);
-        setShowNewSessionModal(false);
-        setNewSessionName('');
-        
-        loadFiles();
-        
-        localStorage.setItem('activeSessionId', newSession.id);
-        localStorage.setItem('activeSessionTitle', newSession.title);
-        
-        try {
-          await fetch(`${apiEndpoints.sessions}/active/${newSession.title}`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({
-              title: newSession.title,
-            }),
-          });
-          
-          // Load chat history for the new session (will be empty for new sessions)
-          await loadChatHistory();
-          
-          // After setting session as active, get the active file
-          await getActiveFile();
-        } catch (error) {
-          console.error('Failed to set new session as active:', error);
-        }
-      } else if (response.status === 409) {
-        setNewSessionError('A chat with this name already exists. Please choose a different name.');
-      } else {
-        console.error('Failed to create session');
-        setNewSessionError('Failed to create session. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error creating session:', error);
-      setNewSessionError('Network error. Please check your connection and try again.');
-    }
-  };
-
-  // Switch session
-  const switchSession = async (session: Session) => {
-    if (currentSession?.id === session.id) return;
-
-    try {
-      console.log(`🔄 User clicked to switch to session: ${session.title}`);
-      const response = await fetch(`${apiEndpoints.sessions}/active/${session.title}`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          title: session.title,
-        }),
-      });
-
-      if (response.ok) {
-        console.log(`✅ Successfully set session ${session.title} as active`);
-        
-        // Set the current session first
-        setCurrentSession(session);
-        
-        // Store session info immediately
-        localStorage.setItem('activeSessionId', session.id);
-        localStorage.setItem('activeSessionTitle', session.title);
-        
-        // Load files and get active file BEFORE loading chat history
-        // This ensures chat history has the correct active file context
-        loadFiles();
-        await getActiveFile();
-        
-        // ALWAYS load chat history when switching sessions - this is the key functionality
-        console.log(`📚 Loading chat history for session: ${session.title}`);
-        await loadChatHistory();
-        
-        console.log(`🎉 Session switch complete for: ${session.title} - Chat history loaded`);
-      } else {
-        console.error('❌ Failed to set session as active on backend');
-        // Even if backend fails, still try to load for better UX
-        setCurrentSession(session);
-        localStorage.setItem('activeSessionId', session.id);
-        localStorage.setItem('activeSessionTitle', session.title);
-        
-        // Load files and active file first
-        loadFiles();
-        await getActiveFile();
-        
-        console.log(`📚 Loading chat history despite backend error for session: ${session.title}`);
-        await loadChatHistory();
-      }
-    } catch (error) {
-      console.error('❌ Error switching session:', error);
-      // Fallback: still try to show the session with proper context
-      setCurrentSession(session);
-      localStorage.setItem('activeSessionId', session.id);
-      localStorage.setItem('activeSessionTitle', session.title);
-      
-      // Load files and active file first, even in error case
-      loadFiles();
-      try {
-        await getActiveFile();
-      } catch (activeFileError) {
-        console.error('Failed to get active file in fallback:', activeFileError);
-      }
-      
-      console.log(`📚 Loading chat history in fallback mode for session: ${session.title}`);
-      await loadChatHistory();
-    }
-  };
-
-  // Delete session
-  const deleteSession = async (session: Session) => {
-    // Check if this is the currently active session
-    if (currentSession?.id === session.id) {
-      alert(`Cannot delete "${session.title}" because it is currently active. Please switch to a different session first.`);
-      return;
-    }
-    setSessionToDelete(session);
-    setShowDeleteSessionModal(true);
-  };
-
-  const confirmDeleteSession = async () => {
-    if (!sessionToDelete) return;
-
-    setDeletingSession(true);
-    try {
-      // Based on UI requirements: DELETE to /api/v1/sessions/{title}
-      const response = await fetch(`${apiEndpoints.sessions}/${sessionToDelete.title}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      });
-
-      if (response.ok) {
-        // Remove session from list
-        setSessions(prev => prev.filter(s => s.id !== sessionToDelete.id));
-        
-        // If this was the current session, switch to another or clear
-        if (currentSession?.id === sessionToDelete.id) {
-          const remainingSessions = sessions.filter(s => s.id !== sessionToDelete.id);
-          if (remainingSessions.length > 0) {
-            await switchSession(remainingSessions[0]);
-          } else {
-            setCurrentSession(null);
-            setMessages([]);
-            setActiveFile(null);
-          }
-        }
-      } else {
-        console.error('Failed to delete session');
-      }
-    } catch (error) {
-      console.error('Error deleting session:', error);
-    } finally {
-      setDeletingSession(false);
-      setShowDeleteSessionModal(false);
-      setSessionToDelete(null);
-    }
-  };
 
 
-  // Save conversation
-  const saveConversation = async () => {
-    if (!currentSession || messages.length === 0) {
-      setSaveMessage('No conversation to save');
-      setTimeout(() => setSaveMessage(''), 3000);
-      return;
-    }
 
-    if (isLoading) {
-      setSaveMessage('Please wait for the response to complete before saving');
-      setTimeout(() => setSaveMessage(''), 3000);
-      return;
-    }
-
-    setSavingConversation(true);
-    setSaveMessage('');
-
-    try {
-      const response = await fetch(apiEndpoints.chatSave, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-      });
-
-      if (response.ok) {
-        setSaveMessage('Conversation saved successfully!');
-        setTimeout(() => setSaveMessage(''), 3000);
-      } else {
-        throw new Error('Failed to save conversation');
-      }
-    } catch (error) {
-      console.error('Error saving conversation:', error);
-      setSaveMessage('Failed to save conversation. Please try again.');
-      setTimeout(() => setSaveMessage(''), 5000);
-    } finally {
-      setSavingConversation(false);
-    }
-  };
 
   // Delete file
   const deleteFile = async (file: FileItem) => {
@@ -1677,7 +1180,7 @@ const ChatPage: React.FC = () => {
 
   // Send message with streaming
   const sendMessage = async () => {
-    if (!inputMessage.trim() || !currentSession || isLoading) return;
+    if (!inputMessage.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -1887,39 +1390,12 @@ const ChatPage: React.FC = () => {
     }
   };
 
-  // Initialize sessions
-  const initializeSessions = useCallback(async () => {
-    await loadSessions();
-    // Load files initially
+  // Initialize app
+  const initializeApp = useCallback(async () => {
+    // No sessions - just load files for the user
     await loadFiles();
-  }, [loadSessions, loadFiles]);
-
-  // Restore active session after sessions are loaded
-  const restoreActiveSession = useCallback(async () => {
-    const savedSessionId = localStorage.getItem('activeSessionId');
-    const savedSessionTitle = localStorage.getItem('activeSessionTitle');
-    
-    if (savedSessionId && savedSessionTitle && sessions.length > 0) {
-      const savedSession = sessions.find(s => s.id === savedSessionId && s.title === savedSessionTitle);
-      if (savedSession) {
-        console.log(`Restoring active session: ${savedSession.title}`);
-        setCurrentSession(savedSession);
-        
-        // First get the active file for this restored session
-        // This ensures chat history loads with correct file context
-        await getActiveFile();
-        
-        // Then load chat history for the restored session
-        await loadChatHistory();
-        
-        console.log(`Session restoration complete for: ${savedSession.title}`);
-      } else {
-        console.log('Saved session not found, clearing localStorage');
-        localStorage.removeItem('activeSessionId');
-        localStorage.removeItem('activeSessionTitle');
-      }
-    }
-  }, [sessions, loadChatHistory, getActiveFile]);
+    console.log('App initialized - all files available');
+  }, [loadFiles]);
 
   // Check if user is authenticated and initialize
   useEffect(() => {
@@ -1929,15 +1405,19 @@ const ChatPage: React.FC = () => {
       return;
     }
     
-    initializeSessions();
-  }, [initializeSessions, router]);
+    initializeApp();
+  }, [initializeApp, router]);
 
-  // Restore active session after sessions are loaded
+  // Initialize app after authentication
   useEffect(() => {
-    if (sessions.length > 0) {
-      restoreActiveSession();
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      // Small delay to ensure other initialization completes first
+      setTimeout(() => {
+        initializeApp();
+      }, 100);
     }
-  }, [sessions, restoreActiveSession]);
+  }, [initializeApp]);
 
   // Auto scroll to bottom - only when not manually scrolling
   const [userScrolled, setUserScrolled] = useState(false);
@@ -1959,25 +1439,20 @@ const ChatPage: React.FC = () => {
   return (
     <div className="h-screen bg-gray-25 flex relative">
       {/* Mobile backdrop */}
-      {(leftSidebarOpen || rightSidebarOpen) && (
-        <div 
+      {rightSidebarOpen && (
+        <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden transition-all duration-300"
           onClick={() => {
-            setLeftSidebarOpen(false);
             setRightSidebarOpen(false);
           }}
         />
       )}
-      
-      {/* Left Sidebar - Chat History */}
-      <div className={`${
-        leftSidebarOpen ? 'w-80 md:w-80' : 'w-0'
-      } transition-all duration-300 ease-in-out overflow-hidden bg-white flex flex-col ${
-        leftSidebarOpen ? 'fixed md:relative z-40 md:z-auto h-full shadow-strong' : ''
-      } border-r border-gray-200`}>
-        {/* Sidebar Header */}
-        <div className="p-6 border-b border-gray-200 bg-white shadow-soft">
-          <div className="flex items-center justify-between mb-5">
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col bg-gray-25">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-soft">
+          <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-3">
               <div className="w-11 h-11 bg-aws-500 rounded-2xl flex items-center justify-center shadow-soft hover:shadow-medium transition-all duration-200 hover:bg-aws-600">
                 <Bot className="w-6 h-6 text-white" />
@@ -1987,222 +1462,37 @@ const ChatPage: React.FC = () => {
                 <p className="text-primary-600 text-sm font-medium">Energy Industry AI Assistant</p>
               </div>
             </div>
-            <button
-              onClick={() => setLeftSidebarOpen(false)}
-              className="p-2.5 hover:bg-primary-50 rounded-2xl transition-all duration-200 group shadow-soft hover:shadow-medium"
-              title="Close sidebar"
-            >
-              <X className="w-4 h-4 text-primary-400 group-hover:text-primary-600" />
-            </button>
           </div>
-          <button
-            onClick={() => setShowNewSessionModal(true)}
-            className="w-full flex items-center justify-center space-x-3 px-5 py-3.5 bg-aws-500 hover:bg-energy-600 text-white rounded-2xl transition-all duration-200 font-semibold shadow-soft hover:shadow-medium hover:scale-[1.02]"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="text-base">New Chat</span>
-            <div className="w-2 h-2 bg-white/30 rounded-full animate-bounce-subtle"></div>
-          </button>
-        </div>
 
-        {/* Chat Sessions */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-2.5">
-          <div className="text-primary-600 text-sm font-semibold uppercase tracking-wider mb-5 px-2">
-            Recent Conversations
-          </div>
-          {sessions.map((session, index) => (
-            <div
-              key={session.id}
-              className="opacity-0 animate-fade-in"
-              style={{ animationDelay: `${index * 0.05}s`, animationFillMode: 'forwards' }}
-            >
-              <div className={`w-full text-left p-4 rounded-2xl transition-all duration-300 group relative overflow-hidden shadow-soft hover:shadow-medium ${
-                currentSession?.id === session.id
-                  ? 'bg-primary-50 text-primary-900 border-2 border-primary-200 shadow-medium'
-                  : 'bg-white text-gray-700 hover:bg-primary-50 hover:text-primary-900 hover:shadow-strong hover:transform hover:scale-[1.02] hover:-translate-y-0.5 border border-gray-200 hover:border-primary-200'
-              }`}>
-                <div className="flex items-center space-x-3">
-                  <div className={`w-2.5 h-2.5 rounded-full transition-all duration-300 shadow-sm ${
-                    currentSession?.id === session.id 
-                      ? 'bg-primary-500 shadow-glow animate-bounce-subtle' 
-                      : 'bg-gray-400 group-hover:bg-primary-400'
-                  }`} />
-                  <div 
-                    className="min-w-0 flex-1 cursor-pointer"
-                    onClick={() => switchSession(session)}
-                  >
-                    <span className="text-base font-semibold truncate block leading-6">
-                      {session.title}
-                    </span>
-                    <span className="text-sm opacity-75 truncate block font-medium">
-                      {session.created_at && !isNaN(new Date(session.created_at).getTime()) 
-                        ? new Date(session.created_at).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })
-                        : 'Recent'
-                      }
-                    </span>
-                    {/* Active file indicator - only show for currently active session */}
-                    {currentSession?.id === session.id && (
-                      <>
-                        {activeFile?.file_name ? (
-                          <div className="mt-2.5 px-2.5 py-1.5 bg-success-50 text-success-700 rounded-xl text-xs font-semibold shadow-soft border border-success-200 min-w-0 flex-shrink">
-                            <span className="block truncate" title={activeFile.file_name}>
-                              {activeFile.file_name}
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="text-xs text-gray-400 mt-2 px-2 italic">
-                            No dataset selected
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <MessageSquare className={`w-4 h-4 transition-all duration-200 ${
-                      currentSession?.id === session.id 
-                        ? 'text-primary-600' 
-                        : 'text-gray-400 group-hover:text-primary-500'
-                    }`} />
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteSession(session);
-                      }}
-                      disabled={currentSession?.id === session.id}
-                      className={`p-2 rounded-2xl transition-all duration-200 shadow-soft ${
-                        currentSession?.id === session.id
-                          ? 'opacity-30 cursor-not-allowed text-gray-400'
-                          : 'opacity-0 group-hover:opacity-100 hover:bg-error-50 hover:text-error-500 hover:shadow-medium hover:scale-110'
-                      }`}
-                      title={currentSession?.id === session.id ? 'Cannot delete active session' : 'Delete session'}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                
-                {/* Active session indicator */}
-                {currentSession?.id === session.id && (
-                  <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-primary-600 rounded-r-full shadow-glow" />
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Sidebar Footer */}
-        <div className="p-5 border-t border-gray-200 bg-white shadow-soft">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-aws-500 rounded-2xl flex items-center justify-center shadow-soft hover:shadow-medium transition-all duration-200 hover:bg-aws-600">
-              <User className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-gray-900 font-semibold text-sm">User</div>
-              <div className="text-primary-600 text-xs font-medium">Free Plan</div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="p-2.5 hover:bg-error-50 rounded-2xl transition-all duration-200 text-gray-500 hover:text-error-600 group shadow-soft hover:shadow-medium hover:scale-110"
-              title="Sign out"
-            >
-              <LogOut className="w-4 h-4 group-hover:scale-110 transition-transform" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col bg-gray-25">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-soft">
-          <div className="flex items-center space-x-4">
-            {!leftSidebarOpen && (
-              <button
-                onClick={() => setLeftSidebarOpen(true)}
-                className="p-2.5 hover:bg-primary-50 rounded-2xl transition-all duration-200 group shadow-soft hover:shadow-medium hover:scale-105"
-              >
-                <Menu className="w-5 h-5 text-primary-500 group-hover:text-primary-700" />
-              </button>
-            )}
-            <div className="flex items-center space-x-4">
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            {/* Save Conversation Button */}
-            {currentSession && messages.length > 0 && (
-              <div className="relative">
-                <button
-                  onClick={saveConversation}
-                  disabled={savingConversation || isLoading}
-                  className={`flex items-center space-x-2 px-4 py-3 rounded-2xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-105 font-semibold ${
-                    savingConversation || isLoading
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-success-600 hover:bg-success-700 text-white shadow-medium hover:shadow-strong'
-                  }`}
-                  title={isLoading ? "Please wait for the response to complete" : "Save conversation"}
-                >
-                  {savingConversation ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                      <span>Saving...</span>
-                    </>
-                  ) : isLoading ? (
-                    <>
-                      <Save className="w-5 h-5" />
-                      <span>Wait...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-5 h-5" />
-                      <span>Save</span>
-                    </>
-                  )}
-                </button>
-                {saveMessage && (
-                  <div className={`absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 text-sm rounded-lg shadow-lg z-50 whitespace-nowrap ${
-                    saveMessage.includes('success') 
-                      ? 'bg-success-100 text-success-800 border border-success-200'
-                      : 'bg-error-100 text-error-800 border border-error-200'
-                  }`}>
-                    {saveMessage}
-                  </div>
-                )}
-              </div>
-            )}
             
             
             <button
               onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
               className={`p-2.5 rounded-2xl transition-all duration-200 group shadow-soft hover:shadow-medium hover:scale-105 ${
-                rightSidebarOpen 
-                  ? 'bg-primary-100 text-primary-600 shadow-medium' 
+                rightSidebarOpen
+                  ? 'bg-primary-100 text-primary-600 shadow-medium'
                   : 'hover:bg-primary-100 text-primary-500 hover:text-primary-700'
               }`}
               title="Dataset Files"
             >
               <PaperclipIcon className="w-6 h-6" />
             </button>
-            {leftSidebarOpen && (
-              <button
-                onClick={() => setLeftSidebarOpen(false)}
-                className="p-2.5 hover:bg-primary-50 rounded-2xl transition-all duration-200 group shadow-soft hover:shadow-medium hover:scale-105"
-                title="Close sidebar"
-              >
-                <X className="w-5 h-5 text-primary-500 group-hover:text-primary-700" />
-              </button>
-            )}
+
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="p-2.5 hover:bg-error-50 rounded-2xl transition-all duration-200 text-gray-500 hover:text-error-600 group shadow-soft hover:shadow-medium hover:scale-105"
+              title="Sign out"
+            >
+              <LogOut className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            </button>
           </div>
         </div>
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto bg-white" onScroll={handleScroll}>
-          {!currentSession ? (
+          {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center p-12">
               <div className="text-center max-w-3xl bg-white rounded-3xl p-8 shadow-strong border border-primary-100">
                 <div className="mb-8">
@@ -2235,14 +1525,6 @@ const ChatPage: React.FC = () => {
                   </div>
                 </div>
                 
-                <button
-                  onClick={() => setShowNewSessionModal(true)}
-                  className="inline-flex items-center space-x-3 px-8 py-4 bg-aws-500 hover:bg-energy-600 text-white font-bold text-base rounded-2xl transition-all duration-200 shadow-medium hover:shadow-strong"
-                >
-                  <Plus className="w-6 h-6" />
-                  <span>Start New Conversation</span>
-                  <ArrowRight className="w-6 h-6" />
-                </button>
               </div>
             </div>
           ) : (
@@ -2370,7 +1652,7 @@ const ChatPage: React.FC = () => {
         </div>
 
         {/* Input Area - Enhanced and optimized */}
-        {currentSession && (
+        {(
           <div className="w-full px-4 py-4 bg-gradient-to-t from-gray-50/80 via-white to-white border-t border-gray-100/60">
             <div className="flex justify-center">
               <div className="w-full max-w-4xl">
@@ -2558,7 +1840,7 @@ const ChatPage: React.FC = () => {
                         </div>
                         <div 
                           className="flex-1 min-w-0 cursor-pointer"
-                          onClick={() => currentSession && setActiveFileForSession(file.file_name || '')}
+                          onClick={() => setActiveFileForSession(file.file_name || '')}
                         >
                           <div className="flex items-center space-x-2.5 mb-2">
                             <span className="font-bold text-gray-900 text-sm break-all">
@@ -2624,61 +1906,6 @@ const ChatPage: React.FC = () => {
         </div>
       </div>
 
-      {/* New Session Modal */}
-      {showNewSessionModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-8 w-full max-w-lg transform transition-all duration-300 scale-100">
-            <div className="flex items-center justify-center mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-aws-500 to-aws-600 rounded-2xl flex items-center justify-center shadow-lg">
-                <MessageSquare className="w-8 h-8 text-white" />
-              </div>
-            </div>
-            
-            <div className="text-center mb-6">
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Start New Energy Session</h2>
-              <p className="text-gray-600 text-lg">Create a new chat session for your energy analysis</p>
-            </div>
-            
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-gray-700 mb-3">Session Name</label>
-              <input
-                type="text"
-                value={newSessionName}
-                onChange={(e) => {
-                  setNewSessionName(e.target.value);
-                  if (newSessionError) setNewSessionError('');
-                }}
-                placeholder="e.g., Reservoir Analysis Q4 2024, Well Performance Review..."
-                className="w-full px-4 py-4 bg-green-50 border-2 border-green-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-400 transition-all shadow-sm hover:shadow-md text-gray-800 placeholder-gray-500"
-                autoFocus
-              />
-              {newSessionError && (
-                <p className="text-red-600 text-sm mt-3 bg-red-50 p-3 rounded-lg border border-red-200">{newSessionError}</p>
-              )}
-            </div>
-            
-            <div className="flex space-x-4">
-              <button
-                onClick={() => {
-                  setShowNewSessionModal(false);
-                  setNewSessionName('');
-                  setNewSessionError('');
-                }}
-                className="flex-1 px-6 py-4 border-2 border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all duration-300 shadow-sm hover:shadow-md"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => createNewSession(newSessionName)}
-                disabled={!newSessionName.trim()}
-                className="flex-1 px-6 py-4 bg-gradient-to-r from-aws-500 to-aws-600 hover:from-energy-600 hover:to-energy-700 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:shadow-lg"
-              >
-                Create Session
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Upload File Modal */}
       {showUploadModal && (
@@ -2721,6 +1948,7 @@ const ChatPage: React.FC = () => {
                       onClick={() => {
                         setSelectedFile(null);
                         setFileName('');
+                        setFileDescription('');
                         if (fileInputRef.current) {
                           fileInputRef.current.value = '';
                         }
@@ -2741,6 +1969,7 @@ const ChatPage: React.FC = () => {
                   if (file) {
                     setSelectedFile(file);
                     setFileName(file.name.split('.')[0]);
+                    setFileDescription(`Energy dataset file: ${file.name}`);
                   }
                 }}
                 className="hidden"
@@ -2755,6 +1984,17 @@ const ChatPage: React.FC = () => {
                   onChange={(e) => setFileName(e.target.value)}
                   placeholder="Enter a name for your dataset..."
                   className="w-full px-4 py-4 bg-aws-50 border-2 border-aws-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-aws-500 focus:border-aws-400 transition-all shadow-sm hover:shadow-md text-gray-800 placeholder-gray-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">Dataset Description</label>
+                <textarea
+                  value={fileDescription}
+                  onChange={(e) => setFileDescription(e.target.value)}
+                  placeholder="Describe the content and purpose of this dataset..."
+                  rows={3}
+                  className="w-full px-4 py-4 bg-aws-50 border-2 border-aws-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-aws-500 focus:border-aws-400 transition-all shadow-sm hover:shadow-md text-gray-800 placeholder-gray-500 resize-none"
                 />
               </div>
 
@@ -2786,6 +2026,7 @@ const ChatPage: React.FC = () => {
                   setShowUploadModal(false);
                   setSelectedFile(null);
                   setFileName('');
+                  setFileDescription('');
                   setUploadError('');
                 }}
                 disabled={uploadingFile}
@@ -2795,7 +2036,7 @@ const ChatPage: React.FC = () => {
               </button>
               <button
                 onClick={uploadFile}
-                disabled={!selectedFile || !fileName.trim() || uploadingFile}
+                disabled={!selectedFile || !fileName.trim() || !fileDescription.trim() || uploadingFile}
                 className="flex-1 px-6 py-4 bg-gradient-to-r from-aws-500 to-aws-600 hover:from-energy-600 hover:to-energy-700 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:shadow-lg"
               >
                 {uploadingFile ? 'Uploading Dataset...' : 'Upload Dataset'}
@@ -2806,44 +2047,6 @@ const ChatPage: React.FC = () => {
       )}
       
 
-      {/* Delete Session Confirmation Modal */}
-      {showDeleteSessionModal && sessionToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 animate-modal-in">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Delete Session</h2>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete the session <strong>&ldquo;{sessionToDelete.title}&rdquo;</strong>? 
-              This action cannot be undone and all messages in this session will be permanently lost.
-            </p>
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setShowDeleteSessionModal(false);
-                  setSessionToDelete(null);
-                }}
-                disabled={deletingSession}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDeleteSession}
-                disabled={deletingSession}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
-              >
-                {deletingSession ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Deleting...
-                  </>
-                ) : (
-                  'Delete Session'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       
       {/* Delete File Confirmation Modal */}
       {showDeleteFileModal && fileToDelete && (

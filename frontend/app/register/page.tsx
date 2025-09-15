@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Check } from 'lucide-react';
+import { apiEndpoints } from '@/lib/api';
 
 interface RegisterFormData {
   email: string;
@@ -36,7 +37,7 @@ const RegisterPage: React.FC = () => {
   const performAutoLogin = async (email: string, password: string) => {
     setIsLoggingIn(true);
     try {
-      const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+      const response = await fetch(apiEndpoints.login, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -87,7 +88,7 @@ const RegisterPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/auth/register', {
+      const response = await fetch(apiEndpoints.register, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

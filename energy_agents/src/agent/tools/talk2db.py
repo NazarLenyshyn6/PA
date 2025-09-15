@@ -13,18 +13,15 @@ from agent.state import AgentState
 @tool
 def talk2db_agent(state: Annotated[AgentState, InjectedToolArg]):
     """
-    Use this tool ONLY if the user explicitly asks to query or analyze data from a database.
-
-    - Handles requests to fetch, query, or summarize database tables.
-    - Do NOT use for general data analysis, ML, or visualization tasks.
-    - Only call this tool if the user specifically mentions a database or database table.
+    Use this tool when the user asks any question related to data analysis.
+    It is responsible for handling requests to analyze, query, or interpret data.
     """
     try:
         response = requests.post(
             url=settings.external_services.Talk2DB, json={"query": state["question"]}
         ).json()
-        result = response["data"]["thoughts"]
+        result = response["data"]["message"]
         return f"data: {json.dumps({'type': 'text', 'data': result})}\n\n"
 
     except Exception:
-        return f"data: {json.dumps({'type': 'text', 'data': "Talk2DB Failed"})}\n\n"
+        return f"data: {json.dumps({'type': 'text', 'data': "Failed"})}\n\n"

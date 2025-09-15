@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Upload, MessageSquare, FileText, LogOut } from 'lucide-react';
+import { apiEndpoints } from '@/lib/api';
 
 const DashboardPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -20,11 +21,16 @@ const DashboardPage: React.FC = () => {
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('file_name', selectedFile.name);
-    formData.append('session_id', '00000000-0000-0000-0000-000000000000'); // Default session ID for dashboard uploads
+    formData.append('file_description', `Uploaded from dashboard: ${selectedFile.name}`);
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/files', {
+      const token = localStorage.getItem('access_token');
+      const tokenType = localStorage.getItem('token_type') || 'Bearer';
+      const response = await fetch(apiEndpoints.fileUpload, {
         method: 'POST',
+        headers: {
+          'Authorization': `${tokenType} ${token}`,
+        },
         body: formData,
       });
 
@@ -46,8 +52,10 @@ const DashboardPage: React.FC = () => {
 
   const handleLogout = () => {
     // Clear any stored auth tokens and redirect to login
-    localStorage.removeItem('authToken');
-    sessionStorage.removeItem('authToken');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('token_type');
+    localStorage.removeItem('isNewLogin');
+    localStorage.removeItem('activeSessionId');
     window.location.href = '/login';
   };
 

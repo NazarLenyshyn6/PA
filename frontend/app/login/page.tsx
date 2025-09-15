@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
+import { apiEndpoints } from '@/lib/api';
 
 interface LoginFormData {
   email: string;
@@ -31,7 +32,7 @@ const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+      const response = await fetch(apiEndpoints.login, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
