@@ -32,3 +32,10 @@ class FileData(BaseSchema):
     data_summary: str
     storage_uri: str
     df: Optional[Any] = None
+
+    def format(self) -> str:
+        return (
+            f"File Name: {self.file_name}\n"
+            f"File Description: {self.file_description}\n"
+            f"Data Summary: {self.data_summary}\n"
+        )

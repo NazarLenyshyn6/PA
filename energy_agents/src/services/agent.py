@@ -1,7 +1,9 @@
 """..."""
 
 import json
+from typing import List, Dict
 
+import pandas as pd
 from langchain_core.messages import HumanMessage
 
 from agent.builder import agent
@@ -15,6 +17,7 @@ class AgentService:
         question: str,
         structured_data_info: str,
         unstructured_data_info: str,
+        storage_uris: List[str],
         tools: str = tools_description,
     ) -> None:
         """..."""
@@ -23,6 +26,7 @@ class AgentService:
                 "question": question,
                 "structured_data_info": structured_data_info,
                 "unstructured_data_info": unstructured_data_info,
+                "storage_uris": storage_uris,
                 "tools": tools,
                 "agent_scratchpad": [HumanMessage(content=question)],
             }

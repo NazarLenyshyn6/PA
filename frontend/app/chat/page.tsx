@@ -556,12 +556,12 @@ const ChatPage: React.FC = () => {
         }
         
         const headerClasses = {
-          1: 'text-2xl font-bold text-gray-900 mt-6 mb-4',
-          2: 'text-xl font-bold text-gray-900 mt-5 mb-3',
-          3: 'text-lg font-semibold text-gray-900 mt-4 mb-3',
-          4: 'text-base font-semibold text-gray-900 mt-4 mb-2',
-          5: 'text-sm font-semibold text-gray-900 mt-3 mb-2',
-          6: 'text-sm font-medium text-gray-900 mt-3 mb-2'
+          1: 'text-2xl font-bold text-slate-900 mt-6 mb-4',
+          2: 'text-xl font-bold text-slate-900 mt-5 mb-3',
+          3: 'text-lg font-semibold text-slate-800 mt-4 mb-3',
+          4: 'text-base font-semibold text-slate-800 mt-4 mb-2',
+          5: 'text-sm font-semibold text-slate-700 mt-3 mb-2',
+          6: 'text-sm font-medium text-slate-700 mt-3 mb-2'
         };
 
         elements.push(
@@ -578,8 +578,8 @@ const ChatPage: React.FC = () => {
         const bulletText = bulletMatch[1];
         elements.push(
           <div key={currentIndex++} className="flex items-start ml-4 mb-2">
-            <span className="text-blue-500 mr-3 mt-1 flex-shrink-0">•</span>
-            <span className="text-gray-800 leading-relaxed">{parseInlineFormatting(bulletText)}</span>
+            <span className="text-slate-900 mr-3 mt-1 flex-shrink-0">•</span>
+            <span className="text-slate-800 leading-relaxed">{parseInlineFormatting(bulletText)}</span>
           </div>
         );
         continue;
@@ -592,8 +592,8 @@ const ChatPage: React.FC = () => {
         const listText = numberedMatch[2];
         elements.push(
           <div key={currentIndex++} className="flex items-start ml-4 mb-2">
-            <span className="text-blue-500 mr-3 mt-1 flex-shrink-0 font-medium">{number}.</span>
-            <span className="text-gray-800 leading-relaxed">{parseInlineFormatting(listText)}</span>
+            <span className="text-slate-900 mr-3 mt-1 flex-shrink-0 font-medium">{number}.</span>
+            <span className="text-slate-800 leading-relaxed">{parseInlineFormatting(listText)}</span>
           </div>
         );
         continue;
@@ -642,7 +642,7 @@ const ChatPage: React.FC = () => {
                 <thead className="bg-gray-50">
                   <tr>
                     {headerRow.map((header, idx) => (
-                      <th key={idx} className="px-4 py-3 text-left text-sm font-semibold text-gray-900 border-b border-gray-200">
+                      <th key={idx} className="px-4 py-3 text-left text-sm font-semibold text-slate-900 border-b border-gray-200">
                         {parseInlineFormatting(header)}
                       </th>
                     ))}
@@ -652,7 +652,7 @@ const ChatPage: React.FC = () => {
                   {dataRows.map((row, rowIdx) => (
                     <tr key={rowIdx} className={`${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-25'} hover:bg-aqua-50 transition-colors duration-150`}>
                       {row.map((cell, cellIdx) => (
-                        <td key={cellIdx} className="px-4 py-3 text-sm text-gray-800 border-b border-gray-100">
+                        <td key={cellIdx} className="px-4 py-3 text-sm text-slate-800 border-b border-gray-100">
                           {parseInlineFormatting(cell)}
                         </td>
                       ))}
@@ -703,7 +703,7 @@ const ChatPage: React.FC = () => {
       
       // Add bold text
       parts.push(
-        <strong key={`bold-${match.index}`} className="font-semibold text-gray-900">
+        <strong key={`bold-${match.index}`} className="font-semibold text-slate-900">
           {match[1]}
         </strong>
       );
@@ -735,7 +735,7 @@ const ChatPage: React.FC = () => {
           
           // Add italic text
           processedParts.push(
-            <em key={`italic-${i}-${italicMatch.index}`} className="italic text-gray-800">
+            <em key={`italic-${i}-${italicMatch.index}`} className="italic text-slate-800">
               {italicMatch[1]}
             </em>
           );
@@ -806,7 +806,7 @@ const ChatPage: React.FC = () => {
           <React.Fragment key={blockIndex}>
             {blockIndex > 0 && (
               <div className="my-8 -mx-6">
-                <div className="h-px bg-gray-400 opacity-40"></div>
+                <div className="h-px bg-gray-300 opacity-60"></div>
               </div>
             )}
             {renderMessageContent(blockContent.trim(), `${messageId}-block-${blockIndex}`, isStreaming)}
@@ -847,20 +847,20 @@ const ChatPage: React.FC = () => {
                 } ${isCollapsed ? 'rounded-xl' : 'rounded-t-xl border-b-0'}`}
                 onClick={() => toggleCodeBlock(codeId)}>
                   <div className="flex items-center space-x-3">
-                    <div className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 transition-all duration-200">
+                    <div className="flex items-center space-x-2 text-slate-600 hover:text-slate-800 transition-all duration-200">
                       {isCollapsed ? (
                         <ChevronRight className="w-4 h-4" />
                       ) : (
                         <ChevronDown className="w-4 h-4" />
                       )}
                     </div>
-                    <span className="text-gray-600 text-sm font-medium">
+                    <span className="text-slate-700 text-sm font-medium">
                       {part.language}
                       {isStreamingCode && (
                         <span className="ml-2 text-green-500 animate-pulse">● executing</span>
                       )}
                       {isCollapsed && (
-                        <span className="ml-2 text-gray-400 text-xs">
+                        <span className="ml-2 text-slate-500 text-xs">
                           ({part.content.split('\n').length} lines)
                         </span>
                       )}
@@ -870,7 +870,7 @@ const ChatPage: React.FC = () => {
                     {!isStreamingCode && !isCollapsed && (
                       <button
                         onClick={(e) => { e.stopPropagation(); copyToClipboard(part.content, codeId); }}
-                        className="flex items-center space-x-1 px-2 py-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-all duration-200 rounded-lg text-xs font-medium"
+                        className="flex items-center space-x-1 px-2 py-1 text-slate-600 hover:text-slate-800 hover:bg-gray-100 transition-all duration-200 rounded-lg text-xs font-medium"
                       >
                         {copiedCode === codeId ? (
                           <>
@@ -890,7 +890,7 @@ const ChatPage: React.FC = () => {
                 {!isCollapsed && (
                   <div className="bg-gray-50 border border-gray-200 border-t-0 shadow-sm transition-all duration-300 rounded-b-xl">
                     <div className="p-4 overflow-x-auto">
-                      <pre className="text-gray-700 text-sm leading-[1.6] font-mono whitespace-pre-wrap">
+                      <pre className="text-slate-800 text-sm leading-[1.6] font-mono whitespace-pre-wrap">
                         <code>
                           {displayContent}
                         </code>
@@ -902,7 +902,7 @@ const ChatPage: React.FC = () => {
             );
           } else {
             return (
-              <div key={index} className="whitespace-pre-wrap leading-relaxed text-gray-800">
+              <div key={index} className="whitespace-pre-wrap leading-relaxed text-slate-800">
                 {renderMarkdownText(part.content.trim())}
               </div>
             );
@@ -1556,7 +1556,7 @@ const ChatPage: React.FC = () => {
                       <div className="max-w-4xl w-full group">
                         
                         <div className="px-6 py-3">
-                          <div className="text-base leading-[1.7] text-gray-800 font-normal text-left">
+                          <div className="text-base leading-[1.7] text-slate-800 font-normal text-left">
                             {message.content ? (
                               <>
                                 {renderMessageWithSeparators(message.content, message.id, isLoading && currentStreamingMessageId === message.id)}

@@ -32,9 +32,15 @@ async def stream(
     # Get user ID from token
     user_id = get_current_user_id(token)
 
+    # Get dfs
+    storage_uris = [
+        file.storage_uri for file in file_service.get_files(db=db, user_id=user_id)
+    ]
+
     # get files descirptions
     structured_data_info = "\n\n".join(
-        str(file) for file in file_service.get_files_metadata(db=db, user_id=user_id)
+        file.format()
+        for file in file_service.get_files_metadata(db=db, user_id=user_id)
     )
 
     unstructured_data_info = """
@@ -52,6 +58,7 @@ async def stream(
         question=question,
         structured_data_info=structured_data_info,
         unstructured_data_info=unstructured_data_info,
+        storage_uris=storage_uris,
     )
 
     return StreamingResponse(stream, media_type="text/event-stream")
