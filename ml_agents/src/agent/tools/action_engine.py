@@ -165,24 +165,20 @@ def _code_execution(code: str, state: AgentState):
         exec(code, global_context)
         return global_context["analysis_report"], global_context.get("image")
 
-    except Exception:
-        return "Failed", None
+    except Exception as e:
+        return (
+            f"""
+Execution Status: Failed
+Result: None
 
+--- PREVIOUS CODE ---
+{code}
 
-def _parse_analysis_report(analysis_report: list) -> str:
-    lines = []
-    for i, entry in enumerate(analysis_report, 1):
-        lines.append(f"Step {i}:")
-        if isinstance(entry, dict):
-            # Format dictionary entries with indentation for readability
-            for key, value in entry.items():
-                formatted_value = pformat(value, indent=4, width=80)
-                lines.append(f"  {key}: {formatted_value}")
-        else:
-            lines.append(f"  {entry}")
-        lines.append("")
-
-    return "\n".join(lines)
+--- ERROR MESSAGE ---
+{str(e)}
+""",
+            None,
+        )
 
 
 @tool
@@ -190,54 +186,62 @@ def action_engine(
     generation_instruction: str, state: Annotated[AgentState, InjectedToolArg]
 ):
     """
-    Executes structured data analysis or forecasting tasks on the already loaded datasets.
+    Executes one subtask of structured time-series analysis or Prophet forecasting on datasets already available in memory.
 
-    This tool should only be used after generating a **complete, production-ready,
-    step-by-step action plan** that corresponds directly to the user’s request.
-    The `generation_instruction` argument must contain the entire plan, written
-    in the strict format followint the system prompt rules.
+    Key Rules:
+        - Only run after a production-ready plan exists.
+        - Execute one logical subtask at a time; do not attempt the full analysis.
+        - Use Prophet only for forecasting.
+        - **All data is fully available in memory**; do not plan or mention ingestion, loading, or uploads. Access it directly.
+        - Steps must be concrete, executable, concise, focused on the subtask.
+        - Minimal preprocessing instructions only for the current subtask (map ds/y, regressors, missing values, outliers).
+        - Visualizations only if explicitly requested.
+        - **MANDATORY CONDITIONAL FAILURE HANDLING:**
+            - Only if a previous code execution in the agent scratchpad failed:
+                - Analyze the failed code and identify the error.
+                - Rethink the subtask plan to fix the issue.
+                - Provide **clear instructions on how to prevent the same error** in future iterations (instructional only, not code).
+            - If no previous failure exists, **do not provide any failure guidance**.
 
-    The tool converts the structured plan into code and executes it on the
-    available data. All modeling must follow the **Prophet-only policy**.
-
-    Important:
-        * All data is already available in the system.
-        * It is **mandatory** to never include data ingestion, loading, or upload steps.
-        * Always assume data access is immediate and schemas are valid.
-
-    When to use:
-        * The user’s request requires actual computation on data
-          (e.g., descriptive statistics, Prophet forecasting, cross-validation,
-          diagnostics, visualizations).
-        * A full, production-ready plan has already been generated.
-        * Do NOT use this tool for explanations or summaries that do not require code.
+    When to Use:
+        - Computation required: stats, forecasting, CV, diagnostics, or requested plots.
+        - A plan exists, but only the current subtask is executed.
+        - **Never use this for data ingestion, loading, or preparation.**
 
     Args:
-        generation_instruction (str):
-            A structured, detailed, production-ready plan following this format:
-                - Title
-                - Assumptions
-                - Step-by-step Action Plan (numbered 1., 1.1, 1.2, …)
-                - Deliverables
-                - Acceptance Criteria
+        generation_instruction (str): The subtask plan only, containing:
+            - Step-by-step action plan
+            - Deliverables (in-memory)
+            - Acceptance Criteria (if any)
+            - **Conditional failure guidance only if previous code failed**
 
-            Each step must be:
-                * Concrete and directly translatable into code.
-                * Prophet-only for forecasting/modeling (no ARIMA, ETS, RNN, etc.).
-                * Explicit in preprocessing, regressors, hyperparameters,
-                  and diagnostics.
-                * Free of any ingestion or loading steps.
+    Requirements:
+        - Each step must be:
+            - Directly executable.
+            - Prophet-based for modeling/forecasting.
+            - Focused only on this subtask.
+            - Minimal but sufficient preprocessing **without touching data ingestion/loading**.
+            - Concise to produce only required outputs.
+            - **Include failure guidance only if previous code failed**; otherwise omit entirely.
 
     Returns:
-        str: Execution results of the action plan.
+        str: Execution results of the subtask, including failure analysis and preventive instructions **only if previous code failed**.
     """
     code = _code_generation(
         generation_instruction=generation_instruction,
         data_summaries=state["data_summaries"],
         dependencies=state["dependencies"],
     )
+    print("=" * 100)
+    print("* GENERATION INSTRUCTION:\n\n")
+    print(generation_instruction)
+    print("=" * 100)
+    print("* GENERATED CODE:\n\n")
     print(code)
-    print()
     analysis_report, image = _code_execution(code, state)
+
+    print("=" * 100)
+    print("* ANALYSIS REPORT:\n\n")
+    print(analysis_report)
 
     return analysis_report, image

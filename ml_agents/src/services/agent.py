@@ -71,7 +71,15 @@ class AgentService:
                 "visualization": None,
             }
         )
-        print(response["visualization"])
+        print("=" * 100)
+        print(
+            "VISUALIZATION: YES"
+            if response["visualization"] is not None
+            else "VISUALIZATION: NO"
+        )
+        print("* ANALYSIS REPORT:\n\n")
+        print(response["agent_scratchpad"][-1].content)
+
         return {
             "visualization": response["visualization"],
             "analysis_report": response["agent_scratchpad"][-1].content,
