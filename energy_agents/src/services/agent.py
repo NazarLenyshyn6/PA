@@ -15,6 +15,7 @@ class AgentService:
     async def stream(
         cls,
         question: str,
+        file_names: List[str],
         structured_data_info: str,
         unstructured_data_info: str,
         storage_uris: List[str],
@@ -24,6 +25,7 @@ class AgentService:
         async for chunk in agent.astream_events(
             {
                 "question": question,
+                "file_names": file_names,
                 "structured_data_info": structured_data_info,
                 "unstructured_data_info": unstructured_data_info,
                 "storage_uris": storage_uris,

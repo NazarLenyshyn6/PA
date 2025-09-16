@@ -20,7 +20,8 @@ def talk2db_agent(state: Annotated[AgentState, InjectedToolArg]):
         response = requests.post(
             url=settings.external_services.Talk2DB, json={"query": state["question"]}
         ).json()
-        result = response["data"]["message"]
+        result = response["data"]["thoughts"]
+        print(result)
         return f"data: {json.dumps({'type': 'text', 'data': result})}\n\n"
 
     except Exception:

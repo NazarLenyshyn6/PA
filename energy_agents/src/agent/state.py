@@ -11,6 +11,7 @@ class AgentState(TypedDict):
     """..."""
 
     question: str
+    file_names: List[str]
     structured_data_info: str
     unstructured_data_info: str
     storage_uris: List[str]

@@ -15,4 +15,4 @@ class AgentRequest(BaseModel):
     question: str
     file_names: List[str]
     data_summaries: List[str]
-    dfs: List[str]
+    data: List[str]

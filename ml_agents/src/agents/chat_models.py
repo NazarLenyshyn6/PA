@@ -7,7 +7,7 @@ from typing import Optional
 from langchain_anthropic import ChatAnthropic
 
 from core.config import settings
-from agent.schemas import GeneratedCode
+from agents.schemas import GeneratedCode
 
 
 def init_anthropic_chat_model(
@@ -40,6 +40,9 @@ low_temp_model = init_anthropic_chat_model(
     temperature=0.0,
 )
 
+mid_temp_model = init_anthropic_chat_model(
+    temperature=0.2,
+)
 
 # Code generation model
 code_generation_model = init_anthropic_chat_model(

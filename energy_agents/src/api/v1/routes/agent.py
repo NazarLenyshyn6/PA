@@ -32,6 +32,11 @@ async def stream(
     # Get user ID from token
     user_id = get_current_user_id(token)
 
+    # Get file names
+    file_names = [
+        file.file_name for file in file_service.get_files(db=db, user_id=user_id)
+    ]
+
     # Get dfs
     storage_uris = [
         file.storage_uri for file in file_service.get_files(db=db, user_id=user_id)
@@ -56,6 +61,7 @@ async def stream(
 
     stream = AgentService.stream(
         question=question,
+        file_names=file_names,
         structured_data_info=structured_data_info,
         unstructured_data_info=unstructured_data_info,
         storage_uris=storage_uris,

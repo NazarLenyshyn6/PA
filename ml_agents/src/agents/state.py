@@ -5,9 +5,10 @@ from typing import TypedDict, List, Dict, Optional
 import pandas as pd
 
 
-class WorkflowState(TypedDict):
+class AgentState(TypedDict):
     """..."""
 
+    question: str
     generation_instruction: str
 
     data_summaries: List[str]

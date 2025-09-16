@@ -9,36 +9,14 @@ from langchain_core.prompts import (
 )
 from langgraph.graph import END
 
-from agent.workflow.state import WorkflowState
-from agent.chat_models import code_generation_model
-
-dependencies = [
-    "numpy",
-    "pandas",
-    "scipy",
-    "sklearn",
-    "statsmodels.api",
-    "joblib",
-    "torch",
-    "torchvision",
-    "lightgbm",
-    "xgboost",
-    "optuna",
-    "sentence_transformers",
-    "gensim==4.3.2",
-    "matplotlib.pyplot",
-    "seaborn",
-    "nltk",
-    "spacy",
-    "tqdm",
-    "networkx",
-    "prophet>=1.2",
-    "nltk>=3.9",
-]
+from agents.state import AgentState
+from agents.chat_models import code_generation_model
+from agents.schemas import GeneratedCode
 
 
-def code_generation(state: WorkflowState):
-    code_generation_prompt = ChatPromptTemplate.from_messages(
+def code_generation(state: AgentState):
+    """..."""
+    prompt = ChatPromptTemplate.from_messages(
         [
             SystemMessagePromptTemplate.from_template(
                 """
@@ -156,8 +134,8 @@ def code_generation(state: WorkflowState):
             ),
         ]
     )
-    chain = code_generation_prompt | code_generation_model
-    generated_code = chain.invoke(
+    chain = prompt | code_generation_model
+    generated_code: GeneratedCode = chain.invoke(
         {
             "generation_instruction": state["generation_instruction"],
             "data_summaries": state["data_summaries"],
@@ -168,11 +146,11 @@ def code_generation(state: WorkflowState):
     return {"code": generated_code.code}
 
 
-def code_execution(state: WorkflowState):
+def code_execution(state: AgentState):
 
     # Import libraries
     global_context = {}
-    for package_name in dependencies:
+    for package_name in state["dependencies"]:
         try:
             module = importlib.import_module(package_name)
             global_context[package_name] = module
@@ -187,16 +165,25 @@ def code_execution(state: WorkflowState):
     # Execute generated code
     try:
         exec(state["code"], global_context)
+        print(global_context.keys())
         return {
+            "error_message": None,
+            "current_debugging_attempt": 1,
             "analysis_report": global_context.get("analysis_report"),
-            "visualization": global_context.get("visualization"),
+            "visualization": global_context.get("image"),
         }
 
-    except Exception:
-        return
+    except Exception as e:
+        return {
+            "error_message": str(e),
+            "current_debugging_attempt": state["current_debugging_attempt"] + 1,
+        }
 
 
-def should_continue(state: WorkflowState):
-    if state["error_message"]:
+def should_continue(state: AgentState):
+    if (
+        state["error_message"]
+        and state["current_debugging_attempt"] < state["max_debugging_attemps"]
+    ):
         return "Error"
     return END
