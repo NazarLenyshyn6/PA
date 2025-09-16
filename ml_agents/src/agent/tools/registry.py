@@ -1,12 +1,10 @@
 """..."""
 
-from agent.tools.talk2db import talk2db_agent
-from agent.tools.insight import insight_agent
-from agent.tools.ml_agent import ml_agent
+from agent.tools.action_engine import action_engine
 
 
 # Avaliables tools
-tools = [insight_agent, ml_agent]
+tools = [action_engine]
 
 # Avaliable tools mapping
 tools_mapping = {tool.name: tool for tool in tools}

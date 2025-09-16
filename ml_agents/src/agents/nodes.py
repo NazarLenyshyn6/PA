@@ -5,8 +5,8 @@ from langchain_core.messages import ToolMessage
 from langgraph.graph import END
 
 from agents.state import AgentState
-from agents.tools.registry import tools_mapping, tools
-from agents.chat_models import mid_temp_model
+from agent.tools.registry import tools_mapping, tools
+from agent.chat_models import mid_temp_model
 
 
 def model_call(state: AgentState):
@@ -45,6 +45,7 @@ You are a **professional data scientist** that helps the user efficiently analyz
 - **Incremental reasoning**: Break the problem into logical steps internally. Use existing scratchpad results before making a new tool call. Avoid redundancy.  
 - **Seamless user experience**: The user must only see final, polished reasoning and insights. Never narrate tool usage, scratchpad checks, or intermediate steps.  
 - **Result quality**: Provide clear, structured, and confident answers. Always connect insights back to the data and user’s intent.
+- **Data avaliability**: Data is already loaded and reasy to user, never mention or plan any data ingestion.
 
 ## Behavior Guidelines
 
@@ -74,7 +75,7 @@ You are a **professional data scientist** that helps the user efficiently analyz
         {
             "question": state["question"],
             "data_summaries": state["data_summaries"],
-            "tools": tools,
+            "tools": state["tools"],
             "agent_scratchpad": state["agent_scratchpad"],
         }
     )
@@ -84,8 +85,15 @@ You are a **professional data scientist** that helps the user efficiently analyz
 def tool_execute(state: AgentState):
     tool_call = state["agent_scratchpad"][-1].tool_calls[0]
     tool = tools_mapping[tool_call["name"]]
-    result = tool.invoke({"state": state})
-    return state
+    result = tool.invoke(
+        {
+            "generation_instruction": tool_call["args"]["generation_instruction"],
+            "state": state,
+        }
+    )
+    return {
+        "agent_scratchpad": [ToolMessage(content=result, tool_call_id=tool_call["id"])]
+    }
 
 
 def should_continue(state: AgentState):

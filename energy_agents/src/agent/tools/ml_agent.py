@@ -15,9 +15,12 @@ from loaders.local import LocalLoader
 
 
 @tool
-def ml_agent(state: Annotated[AgentState, InjectedToolArg]):
+def ml_agent(task: str, state: Annotated[AgentState, InjectedToolArg]):
     """
     Use this tool when the user ask any question related to data anlysis, data visualization, predictions or any other ml tasks on structured data.
+
+    Args:
+        task: Task then ml agent must take into consideration and output results for that task. Stricly declarative with clear definition of what must be done.
     """
     try:
         data = []
@@ -39,16 +42,19 @@ def ml_agent(state: Annotated[AgentState, InjectedToolArg]):
         response = requests.post(
             url=settings.external_services.MLAgent,
             json={
-                "question": state["question"],
+                "question": task,
                 "file_names": state["file_names"],
                 "data_summaries": state["structured_data_info"],
                 "data": data,
             },
-        )
+        ).json()
         analysis_report, visualization = (
             response["analysis_report"],
             response["visualization"],
         )
+
+        print("* analysis report:", analysis_report)
+        print("\n* visualization:", visualization)
 
         # Display visualization if exists, invoke it and retrive fromo on_tool_end
         if visualization:

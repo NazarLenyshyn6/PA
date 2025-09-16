@@ -1,20 +1,24 @@
 """..."""
 
+from typing import Annotated
 import importlib
+from pprint import pformat
 
+from langchain_core.tools import tool, InjectedToolArg
 from langchain_core.prompts import (
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
     SystemMessagePromptTemplate,
 )
-from langgraph.graph import END
 
-from agents.state import AgentState
-from agents.chat_models import code_generation_model
-from agents.schemas import GeneratedCode
+from agent.state import AgentState
+from agent.chat_models import code_generation_model
+from agent.schemas import GeneratedCode
 
 
-def code_generation(state: AgentState):
+def _code_generation(
+    generation_instruction: str, data_summaries: str, dependencies: str
+):
     """..."""
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -137,55 +141,103 @@ def code_generation(state: AgentState):
     chain = prompt | code_generation_model
     generated_code: GeneratedCode = chain.invoke(
         {
-            "generation_instruction": state["generation_instruction"],
-            "data_summaries": state["data_summaries"],
-            "dependencies": state["dependencies"],
-            "error_message": state["error_message"],
+            "generation_instruction": generation_instruction,
+            "data_summaries": data_summaries,
+            "dependencies": dependencies,
         }
-    )
-    return {"code": generated_code.code}
+    ).code
+    return generated_code
 
 
-def code_execution(state: AgentState):
-    print("\n*** GENERATED CODE\n:", state["code"])
-
-    # Import libraries
+def _code_execution(code: str, state: AgentState):
+    """..."""
     global_context = {}
     for package_name in state["dependencies"]:
         try:
             module = importlib.import_module(package_name)
             global_context[package_name] = module
         except Exception:
-            # Ignore import errors for missing packages
             ...
-
-    # Extend with dataframes
     local_context = state["variables"].copy()
     global_context.update(local_context)
 
-    # Execute generated code
     try:
-        exec(state["code"], global_context)
-        print(global_context.keys())
-        return {
-            "error_message": None,
-            "current_debugging_attempt": 1,
-            "analysis_report": global_context.get("analysis_report"),
-            "visualization": global_context.get("image"),
-        }
+        exec(code, global_context)
+        return global_context["analysis_report"], global_context.get("image")
 
-    except Exception as e:
-        print("*** GENERATED CODE FAILED:", str(e))
-        return {
-            "error_message": str(e),
-            "current_debugging_attempt": state["current_debugging_attempt"] + 1,
-        }
+    except Exception:
+        return "Failed", None
 
 
-def should_continue(state: AgentState):
-    if (
-        state["error_message"]
-        and state["current_debugging_attempt"] < state["max_debugging_attemps"]
-    ):
-        return "Error"
-    return END
+def _parse_analysis_report(analysis_report: list) -> str:
+    lines = []
+    for i, entry in enumerate(analysis_report, 1):
+        lines.append(f"Step {i}:")
+        if isinstance(entry, dict):
+            # Format dictionary entries with indentation for readability
+            for key, value in entry.items():
+                formatted_value = pformat(value, indent=4, width=80)
+                lines.append(f"  {key}: {formatted_value}")
+        else:
+            lines.append(f"  {entry}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+@tool
+def action_engine(
+    generation_instruction: str, state: Annotated[AgentState, InjectedToolArg]
+):
+    """
+    Executes structured data analysis or forecasting tasks on the already loaded datasets.
+
+    This tool should only be used after generating a **complete, production-ready,
+    step-by-step action plan** that corresponds directly to the user’s request.
+    The `generation_instruction` argument must contain the entire plan, written
+    in the strict format followint the system prompt rules.
+
+    The tool converts the structured plan into code and executes it on the
+    available data. All modeling must follow the **Prophet-only policy**.
+
+    Important:
+        * All data is already available in the system.
+        * It is **mandatory** to never include data ingestion, loading, or upload steps.
+        * Always assume data access is immediate and schemas are valid.
+
+    When to use:
+        * The user’s request requires actual computation on data
+          (e.g., descriptive statistics, Prophet forecasting, cross-validation,
+          diagnostics, visualizations).
+        * A full, production-ready plan has already been generated.
+        * Do NOT use this tool for explanations or summaries that do not require code.
+
+    Args:
+        generation_instruction (str):
+            A structured, detailed, production-ready plan following this format:
+                - Title
+                - Assumptions
+                - Step-by-step Action Plan (numbered 1., 1.1, 1.2, …)
+                - Deliverables
+                - Acceptance Criteria
+
+            Each step must be:
+                * Concrete and directly translatable into code.
+                * Prophet-only for forecasting/modeling (no ARIMA, ETS, RNN, etc.).
+                * Explicit in preprocessing, regressors, hyperparameters,
+                  and diagnostics.
+                * Free of any ingestion or loading steps.
+
+    Returns:
+        str: Execution results of the action plan.
+    """
+    code = _code_generation(
+        generation_instruction=generation_instruction,
+        data_summaries=state["data_summaries"],
+        dependencies=state["dependencies"],
+    )
+    print(code)
+    print()
+    analysis_report, image = _code_execution(code, state)
+
+    return analysis_report, image

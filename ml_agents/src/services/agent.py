@@ -7,8 +7,9 @@ from typing import List
 import pandas as pd
 from langchain_core.messages import HumanMessage
 
-from agents.builder import agent
-from agents.tools.registry import tools_description
+from agent.builder import agent
+from agent.tools.registry import tools_description
+
 
 # Predefined list of dependencies that the agent may use when executing dynamic code
 dependencies = [
@@ -42,7 +43,7 @@ class AgentService:
         """..."""
         dfs = []
         for df in data:
-            csv_bytes = base64.b64decode(data)
+            csv_bytes = base64.b64decode(df)
             csv_str = csv_bytes.decode("utf-8")
             dfs.append(pd.read_csv(StringIO(csv_str)))
         return dfs
@@ -57,15 +58,21 @@ class AgentService:
     ):
         dfs = cls._get_dfs(data)
         variables = {file_name: df for file_name, df in zip(file_names, dfs)}
-        return agent.invoke(
+        response = agent.invoke(
             {
                 "question": question,
-                "tools": tools_description,
-                "agent_scratchpad": [HumanMessage(content=question)],
                 "variables": variables,
                 "data_summaries": data_summaries,
                 "dependencies": dependencies,
+                "tools": tools_description,
+                "agent_scratchpad": [HumanMessage(content=question)],
                 "current_debugging_attempt": 1,
-                "max_debugging_attemps": 5,
+                "max_debugging_attempts": 5,
+                "visualization": None,
             }
         )
+        print(response["visualization"])
+        return {
+            "visualization": response["visualization"],
+            "analysis_report": response["agent_scratchpad"][-1].content,
+        }

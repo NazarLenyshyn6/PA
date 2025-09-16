@@ -10,19 +10,11 @@ class AgentState(TypedDict):
     """..."""
 
     question: str
-    tools: str
-    generation_instruction: Optional[str]
-    agent_scratchpad: Annotated[List[AnyMessage], add_messages]
-
-    data_summaries: str
     variables: Dict[str, any]
+    data_summaries: str
     dependencies: List[str]
-
-    code: str
-    error_message: Optional[str]
-
+    tools: str
+    agent_scratchpad: Annotated[List[AnyMessage], add_messages]
     current_debugging_attempt: int
-    max_debugging_attemps: int
-
-    analysis_report: List
+    max_debugging_attempts: int
     visualization: Optional[str]

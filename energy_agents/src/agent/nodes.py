@@ -128,7 +128,8 @@ You are a **professional data scientist** that helps the user efficiently analyz
 async def tool_execute(state: AgentState):
     tool_call = state["agent_scratchpad"][-1].tool_calls[0]
     tool = tools_mapping[tool_call["name"]]
-    result = await tool.ainvoke({"state": state})
+    tool_call["args"].update({"state": state})
+    result = await tool.ainvoke(tool_call["args"])
     return {
         "agent_scratchpad": [ToolMessage(content=result, tool_call_id=tool_call["id"])]
     }

@@ -33,6 +33,14 @@ class AgentService:
                 "agent_scratchpad": [HumanMessage(content=question)],
             }
         ):
+            if (
+                chunk["metadata"].get("image", False)
+                and chunk["event"] == "on_chain_end"
+                and chunk["data"].get("output", False)
+            ):
+                data = chunk["data"]["output"].content
+                yield f"data: {json.dumps({'type': 'image', 'data': data})}\n\n"
+
             if chunk["event"] == "on_chat_model_stream":
                 data = chunk["data"]["chunk"].content[0].get("text", "")
                 yield f"data: {json.dumps({'type': 'text', 'data': f"{data}"})}\n\n"
