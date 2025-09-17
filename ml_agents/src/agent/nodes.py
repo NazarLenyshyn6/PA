@@ -181,7 +181,7 @@ For forecasting/modeling requests, produce these explicit steps:
 <reasoning>
 - Stop once enough information is available to answer.
 - For analysis/visualization: answer immediately if tool outputs are sufficient.
-- For modeling: preprocess → train → CV → forecast in the minimal number of steps.
+- For modeling: preprocess → train → CV → forecast in the minimal number of steps. **stop after evaluating performance** and report results.
 - Prefer short, actionable outputs over exhaustive details.
 </reasoning>
 """

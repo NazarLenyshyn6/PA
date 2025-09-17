@@ -236,7 +236,7 @@ def action_engine(
         - If the user requests **forecasting/model training**, produce a **single, production-ready, step-by-step action plan** that is **directly executable by a code-generation model**.
         - The plan must include:
             - In-depth Prophet configuration
-            - Exhaustive hyperparameter tuning
+            - **Minimalistic hyperparameter tuning** for fast execution (do not exhaustively explore all parameters; only check a small, essential set)
             - Time-aware cross-validation
             - Best-model selection
             - All necessary preprocessing steps
