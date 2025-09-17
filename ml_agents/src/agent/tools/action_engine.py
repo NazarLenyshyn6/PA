@@ -97,6 +97,7 @@ __
 - Translate instructions into **time series visualization code only**.
 - Use line plots, trend plots, or time series-specific plots.
 - All plots in a single figure with grid layout.
+- **Maximum of 4 subplots overall; never more than 4.**
 - Legends must not overlap.
 - Initialize `image = None` (mandatory).
 - Save figure to buffer, encode as base64, assign to `image`.
@@ -126,6 +127,7 @@ __
         - Follow exact variable names, step order, and sub-step details.
         - Ensure analysis_report is fully populated with results, numeric values, predictions, or safe skips.
         - Always initialize analysis_report = [] and image = None where required.
+        - If visualization includet it maximum 4 subplots overall.
         - Import only required libraries at the start.
         - Never import unused libraries.
         - Never initialize variables that are not used.
@@ -184,42 +186,62 @@ def action_engine(
     generation_instruction: str, state: Annotated[AgentState, InjectedToolArg]
 ):
     """
-    This tool executes planned actions by transforming a structured generation_instruction into Python code and running it.
+    Executes a full, production-ready structured time-series analysis or Prophet forecasting pipeline on datasets fully available in memory.
+
+    MANDATORY: This must produce a **complete, end-to-end action plan** to accomplish the **entire task in one execution**, not just a single subtask.
 
     Key Rules:
-        - The generation_instruction must be provided by the agent.
-        - It must be formatted as a numbered structured list (1., 2., 3., ...).
-        - It must clearly define:
-            1. What code must be written.
-            2. What data operations must be performed (data is already available in memory as pandas DataFrames).
-            3. What the code must achieve (outputs, transformations, or analysis goals).
-        - If previous executions failed, the generation_instruction must include an additional numbered section:
-            - Explicitly describe how to correct the error and prevent it in future runs.
-        - Instructions must be concise and efficient, avoiding unnecessary detail.
+        - Only run after a production-ready plan exists.
+        - Execute the **entire task in one go**, producing all steps from preprocessing to final forecasting, diagnostics, and model selection.
+        - Use **Prophet only for forecasting**.
+        - **All data is fully available in memory**; never plan, mention, or perform ingestion/loading.
+        - **Strictly forbidden:** Any instructions for data loading, parsing, or structure display.
+        - Steps must be **concrete, directly executable, concise, and focused** on completing the full task.
+        - Include **minimal preprocessing only for necessary steps** (mapping ds/y, regressors, handling missing values/outliers).
+        - **All zero values (`0`) must be considered missing** and imputed together with other missing values, **always**.
+        - Visualizations only if explicitly requested, with **maximum 4 subplots**.
+        - **Mandatory Conditional Failure Handling:**
+            - Only trigger if previous code execution failed:
+                - Analyze the failed code and identify the error.
+                - Rethink the plan to fix it.
+                - Provide **instructional guidance** to prevent the same error in future iterations (do not include code).
+            - If no previous failure exists, **omit failure guidance entirely**.
 
     When to Use:
-        - A structured generation_instruction exists.
-        - The agent needs to execute code to achieve the defined goal.
-        - Previous failures must be addressed by including corrective steps in the list.
+        - Computation required: stats, forecasting, cross-validation, diagnostics, or requested plots.
+        - A plan exists; execute **the entire task in one execution**.
+        - **Never use this for data ingestion, loading, or preparation.**
 
     Args:
-        generation_instruction (str): A structured, numbered plan containing:
-            1. Code that must be written.
-            2. Data operations to perform (using in-memory DataFrames).
-            3. Outputs or deliverables expected.
-            4. Error correction guidance (only if previous execution failed).
+        generation_instruction (str): The full-task plan, including:
+            - Step-by-step action plan
+            - Deliverables (in-memory)
+            - Acceptance Criteria (if any)
+            - Conditional failure guidance **only if previous code failed**
 
-    Mandatory requirements:
-        - Plans must always begin with a short title providing context for the subtask.
-        - Deliverables and acceptance criteria must always be explicitly included.
-        - Each step must be part of a structured numbered list.
-        - Plans must be clear, concise, and directly executable.
-        - No unnecessary steps or verbose detail should be included.
-        - Failure handling instructions must only appear if a previous execution failed.
+    Requirements:
+        - Each step must be:
+            - Directly executable
+            - Prophet-based for modeling/forecasting
+            - Focused **on completing the full task**
+            - Include minimal preprocessing (without touching ingestion/loading)
+            - **Zero values (`0`) must always be treated as missing and imputed**
+            - Concise to produce only required outputs
+            - **Include failure guidance only if previous code failed**
 
     Returns:
-        str: Execution results of the generated code.
-             Includes corrective analysis only if error handling instructions were provided.
+        str: Execution results of the full task, including failure analysis and preventive instructions **only if previous code failed**.
+
+    Additional Instructions for Forecasting/Model Training:
+        - If the user requests **forecasting/model training**, produce a **single, production-ready, step-by-step action plan** that is **directly executable by a code-generation model**.
+        - The plan must include:
+            - In-depth Prophet configuration
+            - Exhaustive hyperparameter tuning
+            - Time-aware cross-validation
+            - Best-model selection
+            - All necessary preprocessing steps
+            - **Zero values (`0`) treated as missing and imputed like other NaNs**
+        - The trained model must be **top-performing**; do not leave Prophet at default parameters.
     """
     code = _code_generation(
         generation_instruction=generation_instruction,
@@ -234,8 +256,6 @@ def action_engine(
     print(code)
     analysis_report, image = _code_execution(code, state)
 
-    print("=" * 100)
-    print("* ANALYSIS REPORT:\n\n")
     print(analysis_report)
 
     return analysis_report, image

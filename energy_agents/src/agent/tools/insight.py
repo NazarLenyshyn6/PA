@@ -16,7 +16,7 @@ def insight_agent(state: Annotated[AgentState, InjectedToolArg]):
     A specialized tool for analyzing unstructured data.
 
     This tool is used exclusively to answer questions related to unstructured data.
-    It should ONLY be invoked when the user’s query refers to data that is unstructured
+    It should only be invoked when the user’s query involves unstructured data.
     """
     try:
         response = requests.post(

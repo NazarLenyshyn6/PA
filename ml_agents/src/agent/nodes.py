@@ -24,11 +24,8 @@ For data visualization: Perform only the necessary preprocessing required for cl
 visualization. Generate visualizations that show exactly what the user requests. Do not
 extend scope or add unnecessary steps.
 
-For prediction: Aim for the highest possible model performance. First, understand the
-data, its features, and proportions. Based on this understanding, apply the most suitable
-preprocessing. Then, on the preprocessed data, train a Prophet model only. Select optimal
-hyperparameters, evaluate the model, and ensure it achieves decent performance and metrics.
-Finally, use that model to make predictions and present the output in the way the user requires.
+For prediction: Always use Prophet. Ensure preprocessing, training, cross-validation, and tuning are done, but keep it as fast and concise as possible. 
+Prioritize quick delivery of results while still achieving high-quality forecasts and metrics.
 
 You will be provided with the following information:
 
@@ -43,6 +40,8 @@ You will be provided with the following information:
 <agent_scratchpad>
 {agent_scratchpad}
 </agent_scratchpad>
+
+All datasets already loaded, skip this part and keep on going knowing that data is loaded.
 
 When answering user question, follow this quidelines:
 <data_analysis>
@@ -62,6 +61,7 @@ When answering user question, follow this quidelines:
 
 # 3. Data Cleaning
 - Impute missing values: use forward fill, backward fill, or interpolation depending on data type.  
+- Treat any value of **0** as a missing value (`NaN`) and impute it according to the column-specific strategy.
 - Remove or correct duplicates and erroneous entries.  
 - Correct data types if necessary (e.g., convert strings to datetime).  
 - Ensure the time series has a consistent frequency; resample if necessary.  
@@ -135,60 +135,40 @@ When answering user question, follow this quidelines:
 </data_visualization>
 
 <modeling>
-# 0. Prerequisites
-- Before training any Prophet model, ensure **all data analysis and preprocessing steps have been completed** as outlined in the Data Analysis section.  
-- This includes:  
-    - Handling missing values and duplicates.  
-    - Ensuring consistent time frequency and continuous datetime index.  
-    - Creating necessary lag features, rolling statistics, and relevant exogenous variables.  
-    - Identifying and documenting anomalies or outliers.  
-- Only after completing these steps, proceed to model training.  
+# PROPHET MODELING (NO OTHER MODELS)
+For forecasting/modeling requests, produce these explicit steps:
+1) **Train/Validation Split (Chronological)**
+   - Specify initial train window, validation horizon(s), and any holdout.
 
-# 1. Data Preparation for Prophet
-- Prepare the dataset with columns `ds` (datetime) and `y` (target variable).  
-- Align any additional regressors (exogenous features) with the time index.  
-- Ensure the cleaned and preprocessed dataset is fully ready for modeling.  
+2) **Prophet Configuration (Initial)**
+   - Growth: linear or logistic (if using `cap`/`floor`).
+   - Seasonality mode: additive or multiplicative.
+   - Enabled seasonalities (name, period, Fourier order).
+   - Holidays/events (source and dataframe construction).
+   - Regressors via `add_regressor` (names, transformations).
 
-# 2. Initial Prophet Model Training
-- Instantiate a Prophet model with default or recommended settings.  
-- Fit the model on the preprocessed historical data up to the last available data point.  
-- Inspect initial forecast and residuals for any misfits.  
+3) **Hyperparameter Tuning (Prophet-Only, Always Required)**
+   - Parameters to search: `changepoint_prior_scale`, `seasonality_prior_scale`, `holidays_prior_scale`, `seasonality_mode`, growth, `changepoint_range`, per-seasonality Fourier orders.
+   - Define search space/grid and search strategy (grid or Bayesian if available offline).
+   - Use **time-aware CV** with Prophet’s `cross_validation(initial=..., period=..., horizon=...)`.
+   - Evaluate with `performance_metrics` and report metrics (RMSE, MAE, MAPE, sMAPE, WAPE, optionally coverage).
+   - **Select hyperparameter ranges wisely** to avoid excessively long training times—prioritize reasonable ranges over exhaustive grids to keep wait times short.
+   - Select best config by primary metric (state which) with secondary tie-breaker.
 
-# 3. Hyperparameter Tuning
-- Optimize critical Prophet parameters iteratively:  
-    - `seasonality_mode` (additive or multiplicative)  
-    - `changepoint_prior_scale` (trend flexibility)  
-    - `seasonality_prior_scale` (seasonality flexibility)  
-    - `holidays_prior_scale` (if holidays are included)  
-- Use rolling or expanding window cross-validation to evaluate performance.  
-- Select the combination of parameters that minimizes RMSE, MAE, or MAPE.  
+4) **Refit Best Prophet (Mandatory)**
+   - Refit on full train (train+val if acceptable) with selected params.
+   - Keep all artifacts (model object, params, scalers, holiday tables) **in memory only**.
+   - Ensure final model is **best-performing**, not default baseline.
 
-# 4. Model Evaluation
-- Evaluate performance on validation sets using metrics: RMSE, MAE, MAPE.  
-- Inspect predicted vs actual values visually for trends, seasonality, and anomalies.  
-- Examine residuals for autocorrelation or patterns not captured by the model.  
+5) **Final Forecast Generation**
+   - Build future dataframe with correct horizon and regressors.
+   - Generate forecast with Prophet; produce `yhat`, `yhat_lower`, `yhat_upper`.
+   - Post-process any transformations (inverse scaling/log, etc.).
 
-# 5. Model Quality Improvement
-- Refine the model based on evaluation:  
-    - Adjust `changepoint_prior_scale` for trend responsiveness.  
-    - Modify seasonal components to reduce overfitting or underfitting.  
-    - Include additional regressors if explanatory variables are missing.  
-- Iterate until cross-validation metrics are optimized and residuals show no systematic patterns.  
-
-# 6. Forecasting
-- Generate forecasts starting **from the last data point** in the preprocessed dataset.  
-- Include prediction intervals (default 80% or user-specified).  
-- Always use the **highest-quality, fully tuned Prophet model** for final predictions.  
-
-# 7. Presenting Predictions
-- Provide a line plot of historical data vs predicted values with confidence intervals.  
-- Highlight key forecast periods or expected anomalies.  
-- Provide a table of predicted values aligned with their timestamps for user reference.  
-
-# 8. Continuous Improvement (Optional)
-- Update the model incrementally when new data is available.  
-- Periodically re-tune hyperparameters if model performance drops.  
-- Maintain detailed documentation of model parameters, performance, and preprocessing steps for reproducibility.  
+6) **Diagnostics**
+   - Residual analysis (autocorrelation check via Prophet residuals).
+   - Drift/instability notes across horizons using CV outputs.
+   - Explicit acceptance criteria: compare final metrics to target thresholds (state thresholds if user provides).
 <modeling>
 
 <error_handling>
@@ -198,13 +178,18 @@ When answering user question, follow this quidelines:
 - If no mistake was shown, proceed normally without altering the process.  
 </error_handling>
 
-Act rigorously and iteratively: do not perform casual or superficial actions. 
-Always reason carefully about the user's data and every processing step. Never present a final numeric solution or recommendation if the user's data have not been fully described, validated, and if any scaled or transformed outputs have not been inverse-transformed (descaled) back to interpretable original units. 
-After each tool call, reflect on what inputs and outputs you actually received, use that reasoning to choose the best next step, and repeat the analyze → tool → reflect → plan loop until you converge on a high-quality, well-justified answer for the user.
+<reasoning>
+- Stop once enough information is available to answer.
+- For analysis/visualization: answer immediately if tool outputs are sufficient.
+- For modeling: preprocess → train → CV → forecast in the minimal number of steps.
+- Prefer short, actionable outputs over exhaustive details.
+</reasoning>
 """
     print("\n\nAGENT SCRAPTCHPAD")
     print("=" * 100)
-    print(state["agent_scratchpad"])
+    for message in state["agent_scratchpad"]:
+        print("MESSAGE:\n", message.content)
+        print("\n\n")
     # remove state from args in tool calls
     if isinstance(state["agent_scratchpad"], AIMessage):
         state["agent_scratchpad"].tool_calls[-1]["args"].pop("state")
@@ -222,17 +207,18 @@ After each tool call, reflect on what inputs and outputs you actually received, 
         }
     )
     # Remove state from tool call args
-    print("************* ARGS *****", response.tool_calls[0]["args"])
-    return {"agent_scratchpad": response}
+    return {"agent_scratchpad": [response]}
 
 
 def tool_execute(state: AgentState):
     """..."""
     tool_call = state["agent_scratchpad"][-1].tool_calls[0]
     tool = tools_mapping[tool_call["name"]]
-    tool_call["args"].update({"state": state})
 
-    analysis_report, image = tool.invoke(tool_call["args"])
+    args = tool_call["args"].copy()
+    args.update({"state": state})
+
+    analysis_report, image = tool.invoke(args)
     return {
         "agent_scratchpad": [
             ToolMessage(content=analysis_report, tool_call_id=tool_call["id"])

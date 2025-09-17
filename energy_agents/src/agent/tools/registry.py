@@ -1,6 +1,5 @@
 """..."""
 
-from agent.tools.talk2db import talk2db_agent
 from agent.tools.insight import insight_agent
 from agent.tools.ml_agent import ml_agent
 

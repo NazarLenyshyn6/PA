@@ -17,10 +17,10 @@ from loaders.local import LocalLoader
 @tool
 def ml_agent(task: str, state: Annotated[AgentState, InjectedToolArg]):
     """
-    Use this tool when the user ask any question related to data anlysis, data visualization, predictions or any other ml tasks on structured data.
+    Use this tool when the user asks any question related to data analysis, data visualization, predictions, or any other ML tasks on structured data.
 
     Args:
-        task: Task then ml agent must take into consideration and output results for that task. Stricly declarative with clear definition of what must be done.
+        task: The task the ML agent must take into consideration and output results for. Strictly declarative, with a clear definition of what must be done.
     """
     try:
         data = []
