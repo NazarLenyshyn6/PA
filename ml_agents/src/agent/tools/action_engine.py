@@ -184,47 +184,42 @@ def action_engine(
     generation_instruction: str, state: Annotated[AgentState, InjectedToolArg]
 ):
     """
-    Executes one subtask of structured time-series analysis or Prophet forecasting on datasets already available in memory.
+    This tool executes planned actions by transforming a structured generation_instruction into Python code and running it.
 
     Key Rules:
-        - Only run after a production-ready plan exists.
-        - Execute one logical subtask at a time; do not attempt the full analysis.
-        - Use Prophet only for forecasting.
-        - **All data is fully available in memory**; do not plan or mention ingestion, loading, or uploads. Access it directly.
-        - **EXTREMELY MANDATORY RULE:** Data loading, ingestion, parsing, or structure display instructions are strictly forbidden.
-        - Steps must be concrete, executable, concise, focused on the subtask.
-        - Minimal preprocessing instructions only for the current subtask (map ds/y, regressors, missing values, outliers).
-        - Visualizations only if explicitly requested.
-        - **MANDATORY CONDITIONAL FAILURE HANDLING:**
-            - Only if a previous code execution in the agent scratchpad failed:
-                - Analyze the failed code and identify the error.
-                - Rethink the subtask plan to fix the issue.
-                - Provide **clear instructions on how to prevent the same error** in future iterations (instructional only, not code).
-            - If no previous failure exists, **do not provide any failure guidance**.
+        - The generation_instruction must be provided by the agent.
+        - It must be formatted as a numbered structured list (1., 2., 3., ...).
+        - It must clearly define:
+            1. What code must be written.
+            2. What data operations must be performed (data is already available in memory as pandas DataFrames).
+            3. What the code must achieve (outputs, transformations, or analysis goals).
+        - If previous executions failed, the generation_instruction must include an additional numbered section:
+            - Explicitly describe how to correct the error and prevent it in future runs.
+        - Instructions must be concise and efficient, avoiding unnecessary detail.
 
     When to Use:
-        - Computation required: stats, forecasting, CV, diagnostics, or requested plots.
-        - A plan exists, but only the current subtask is executed.
-        - **Never use this for data ingestion, loading, or preparation.**
+        - A structured generation_instruction exists.
+        - The agent needs to execute code to achieve the defined goal.
+        - Previous failures must be addressed by including corrective steps in the list.
 
     Args:
-        generation_instruction (str): The subtask plan only, containing:
-            - Step-by-step action plan
-            - Deliverables (in-memory)
-            - Acceptance Criteria (if any)
-            - **Conditional failure guidance only if previous code failed**
+        generation_instruction (str): A structured, numbered plan containing:
+            1. Code that must be written.
+            2. Data operations to perform (using in-memory DataFrames).
+            3. Outputs or deliverables expected.
+            4. Error correction guidance (only if previous execution failed).
 
-    Requirements:
-        - Each step must be:
-            - Directly executable.
-            - Prophet-based for modeling/forecasting.
-            - Focused only on this subtask.
-            - Minimal but sufficient preprocessing **without touching data ingestion/loading**.
-            - Concise to produce only required outputs.
-            - **Include failure guidance only if previous code failed**; otherwise omit entirely.
+    Mandatory requirements:
+        - Plans must always begin with a short title providing context for the subtask.
+        - Deliverables and acceptance criteria must always be explicitly included.
+        - Each step must be part of a structured numbered list.
+        - Plans must be clear, concise, and directly executable.
+        - No unnecessary steps or verbose detail should be included.
+        - Failure handling instructions must only appear if a previous execution failed.
 
     Returns:
-        str: Execution results of the subtask, including failure analysis and preventive instructions **only if previous code failed**.
+        str: Execution results of the generated code.
+             Includes corrective analysis only if error handling instructions were provided.
     """
     code = _code_generation(
         generation_instruction=generation_instruction,
