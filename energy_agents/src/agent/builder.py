@@ -1,4 +1,8 @@
-"""..."""
+"""
+This module defines and compiles a state graph for an agent using LangGraph.
+The agent alternates between model calls and tool execution based on
+conditional logic.
+"""
 
 from langgraph.graph import START, END, StateGraph
 

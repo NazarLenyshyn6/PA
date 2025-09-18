@@ -1,5 +1,10 @@
 """
-...
+Agent interaction API routes.
+
+Provides endpoints for streaming AI agent responses based on:
+- User question
+- Structured data from uploaded files
+- Unstructured data from external PDFs
 """
 
 from sqlalchemy.orm import Session
@@ -25,29 +30,36 @@ async def stream(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(db_manager.get_db),
 ):
-    """
-    ...
+    """Stream AI agent responses to the client as Server-Sent Events (SSE).
+
+    Combines structured data (user files) and unstructured data (PDF summaries)
+    to provide contextual answers for the given question.
+
+    Args:
+        question (str): The user’s question.
+        token (str, optional): OAuth2 bearer token. Injected via dependency.
+        db (Session, optional): Database session. Injected via dependency.
+
+    Returns:
+        StreamingResponse: Stream of agent events in SSE format.
     """
 
     # Get user ID from token
     user_id = get_current_user_id(token)
 
-    # Get file names
-    file_names = [
-        file.file_name for file in file_service.get_files(db=db, user_id=user_id)
-    ]
-
-    # Get dfs
+    # collect filenames and storage URIs
+    file_names = [f.file_name for f in file_service.get_files(db=db, user_id=user_id)]
     storage_uris = [
-        file.storage_uri for file in file_service.get_files(db=db, user_id=user_id)
+        f.storage_uri for f in file_service.get_files(db=db, user_id=user_id)
     ]
 
-    # get files descirptions
+    # Get structured data description for all user files
     structured_data_info = "\n\n".join(
         file.format()
         for file in file_service.get_files_metadata(db=db, user_id=user_id)
     )
 
+    # Summary of unstractured data avaliable to user
     unstructured_data_info = """
 *** Available PDF Files ***
 

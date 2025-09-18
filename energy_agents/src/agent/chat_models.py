@@ -1,5 +1,8 @@
 """
-...
+Anthropic model factory module.
+
+This module provides a factory function to create preconfigured
+Anthropic `ChatAnthropic` models with sensible defaults.
 """
 
 from typing import Optional
@@ -21,8 +24,19 @@ def init_anthropic_chat_model(
     top_k: Optional[int] = None,
     top_p: Optional[float] = None,
 ) -> ChatAnthropic:
-    """
-    ...
+    """Initializes an Anthropic Chat model with specified parameters.
+
+    Args:
+        model_name: Name of the Anthropic model.
+        temperature: Sampling temperature controlling randomness.
+        max_tokens: Maximum number of tokens for responses.
+        streaming: Enable streaming responses if True.
+        stream_usage: Track usage during streaming if True.
+        top_k: Optional top-k sampling parameter.
+        top_p: Optional top-p (nucleus) sampling parameter.
+
+    Returns:
+        An instance of `ChatAnthropic` configured with the provided settings.
     """
     return ChatAnthropic(
         model_name=model_name,
@@ -36,7 +50,6 @@ def init_anthropic_chat_model(
     )
 
 
-# --- General-purpose shared models ---
 low_temp_model = init_anthropic_chat_model(
     temperature=0.2,
 )

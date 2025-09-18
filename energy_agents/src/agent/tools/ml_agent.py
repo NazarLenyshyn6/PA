@@ -1,7 +1,9 @@
-"""..."""
+"""
+This module defines a specialized tool for analyzing structured data
+using an external MLAgent service.
+"""
 
 from typing import Annotated
-import json
 import base64
 
 import requests
@@ -23,40 +25,37 @@ def ml_agent(task: str, state: Annotated[AgentState, InjectedToolArg]):
         task: The task the ML agent must take into consideration and output results for. Strictly declarative, with a clear definition of what must be done.
     """
     try:
-        data = []
+        encoded_data_list = []
+
+        # Iterate over all stored data files and encode them for the ML agent
         for storage_uri in state["storage_uris"]:
-            # Load data
+            # Load data as DataFrame
             df = LocalLoader.load(storage_uri)
 
-            # Convert DataFrame to CSV bytes
-            csv_str = df.to_csv(index=False)
-            csv_bytes = csv_str.encode("utf-8")
+            # Convert DataFrame to CSV and then to bytes
+            csv_bytes = df.to_csv(index=False).encode("utf-8")
 
-            # Encode as Base64
+            # Encode CSV bytes to Base64 for transmission
             encoded_data = base64.b64encode(csv_bytes).decode("utf-8")
+            encoded_data_list.append(encoded_data)
 
-            # Append to data
-            data.append(encoded_data)
-
-        # Send request to ml agent
+        # Send task and data to the external ML agent service
         response = requests.post(
             url=settings.external_services.MLAgent,
             json={
                 "question": task,
                 "file_names": state["file_names"],
                 "data_summaries": state["structured_data_info"],
-                "data": data,
+                "data": encoded_data_list,
             },
         ).json()
+
         analysis_report, visualization = (
             response["analysis_report"],
             response["visualization"],
         )
 
-        print("* analysis report:", analysis_report)
-        print("\n* visualization:", visualization)
-
-        # Display visualization if exists, invoke it and retrive fromo on_tool_end
+        # If a visualization exists, display it using RunnableLambda
         if visualization:
             visualization_display_model = RunnableLambda(
                 lambda _: AIMessage(
@@ -67,8 +66,8 @@ def ml_agent(task: str, state: Annotated[AgentState, InjectedToolArg]):
                 "...", config={"metadata": {"image": True}}
             )
 
-        # Return textual analysis report back to agent
+        # Return the textual analysis report
         return analysis_report
 
     except Exception:
-        return f"data: {json.dumps({'type': 'text', 'data': "Failed"})}\n\n"
+        return "Failed"

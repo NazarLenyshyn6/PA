@@ -1,7 +1,9 @@
-"""..."""
+"""
+This module defines a specialized tool for analyzing unstructured data
+using an external InsightAgent service.
+"""
 
 from typing import Annotated
-import json
 
 import requests
 from langchain_core.tools import tool, InjectedToolArg
@@ -19,6 +21,7 @@ def insight_agent(state: Annotated[AgentState, InjectedToolArg]):
     It should only be invoked when the user’s query involves unstructured data.
     """
     try:
+        # Send the user's question to the external InsightAgent service
         response = requests.post(
             url=settings.external_services.InsightAgent,
             json={
@@ -31,8 +34,10 @@ def insight_agent(state: Annotated[AgentState, InjectedToolArg]):
                 "response_style": "string",
             },
         ).json()
+
+        # Extract the answer from the service response
         result = response["answer"]
-        print(result)
-        return f"data: {json.dumps({'type': 'text', 'data': result})}\n\n"
+        return result
+
     except Exception:
-        return f"data: {json.dumps({'type': 'text', 'data': "Failed"})}\n\n"
+        return "Failed"

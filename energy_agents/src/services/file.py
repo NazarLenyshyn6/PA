@@ -1,4 +1,9 @@
-"""..."""
+"""
+Service layer for file management.
+
+Handles uploading, retrieving, caching, and deleting user files
+across supported storage backends (e.g., local storage).
+"""
 
 from dataclasses import dataclass
 from typing import List, Dict, ClassVar
@@ -16,10 +21,11 @@ from repositories.file import FileRepository
 
 @dataclass
 class FileService:
-    """..."""
+    """Service class for managing file operations."""
 
     file_cache: FileCacheManager
 
+    # Mapping of storage types to their backend implementations
     STORAGE_MAPPING: ClassVar[Dict[StorageType, BaseStorage]] = {
         StorageType.LOCAL: LocalStorage
     }
@@ -27,7 +33,17 @@ class FileService:
     def get_files(
         self, db: Session, user_id: int, storage_type: StorageType = StorageType.LOCAL
     ) -> List[FileData]:
+        """Retrieve files for a user, preferring cache over database.
 
+        Args:
+            db (Session): Active database session.
+            user_id (int): ID of the user requesting files.
+            storage_type (StorageType, optional): Storage backend type.
+                Defaults to local storage.
+
+        Returns:
+            List[FileData]: List of files belonging to the user.
+        """
         # Try cache first
         cached_files = self.file_cache.get_cached_files(user_id=user_id)
         if cached_files:
@@ -46,11 +62,19 @@ class FileService:
                 file_data=FileData.model_validate(file),
             )
 
-        # Return updated cache
+        # Return updated cache contents
         return list(self.file_cache.get_cached_files(user_id=user_id).values())
 
     def get_files_metadata(self, db: Session, user_id: int) -> List[FileData]:
-        """..."""
+        """Fetch metadata of user files directly from the database.
+
+        Args:
+            db (Session): Active database session.
+            user_id (int): ID of the user.
+
+        Returns:
+            List[FileData]: File metadata objects.
+        """
         db_files = FileRepository.get_files(db=db, user_id=user_id)
         return [FileData.model_validate(file) for file in db_files]
 
@@ -63,12 +87,22 @@ class FileService:
         file_description: str,
         storage_type: StorageType = StorageType.LOCAL,
     ) -> None:
-        """..."""
+        """Upload a file, storing it in backend, DB, and cache.
+
+        Args:
+            db (Session): Active database session.
+            file (UploadFile): File object to upload.
+            user_id (str): ID of the uploading user.
+            file_name (str): Desired name for the file.
+            file_description (str): Description of the file.
+            storage_type (StorageType, optional): Storage backend type.
+                Defaults to local storage.
+        """
 
         # Select storage backend
         storage = self.STORAGE_MAPPING[storage_type]
 
-        # Save file to storage, get its URI and summary
+        # Save file to storage, get URI and auto-generated summary
         storage_uri, data_summary = storage.upload_file(
             file_name=file_name, user_id=user_id, file=file
         )
@@ -106,8 +140,17 @@ class FileService:
         file_name: str,
         storage_type: StorageType = StorageType.LOCAL,
     ):
-        """
-        ...
+        """Delete a user file from storage, database, and cache.
+
+        Args:
+            db (Session): Active database session.
+            user_id (int): ID of the user.
+            file_name (str): Name of the file to delete.
+            storage_type (StorageType, optional): Storage backend type.
+                Defaults to local storage.
+
+        Raises:
+            HTTPException: If the file does not exist.
         """
         # Verify file exists in DB
         db_file = FileRepository.get_file(db=db, user_id=user_id, file_name=file_name)

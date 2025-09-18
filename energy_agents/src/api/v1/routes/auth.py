@@ -1,5 +1,10 @@
 """
-...
+Authentication API routes.
+
+Provides endpoints for:
+- Retrieving the current authenticated user
+- User registration
+- User login with OAuth2 password flow
 """
 
 from sqlalchemy.orm import Session
@@ -22,16 +27,28 @@ def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(db_manager.get_db),
 ):
-    """
-    ...
+    """Retrieve the currently authenticated user.
+
+    Args:
+        token (str, optional): OAuth2 bearer token. Defaults via dependency injection.
+        db (Session, optional): Database session. Defaults via dependency injection.
+
+    Returns:
+        UserRead: Authenticated user's information.
     """
     return auth_service_.get_current_user(db=db, token=token)
 
 
 @router.post("/register")
 def register_user(user: UserCreate, db: Session = Depends(db_manager.get_db)):
-    """
-    ...
+    """Register a new user.
+
+    Args:
+        user (UserCreate): User registration data (email and password).
+        db (Session, optional): Database session. Defaults via dependency injection.
+
+    Returns:
+        UserInDB: Created user information.
     """
     return UserService.create_user(db=db, user=user)
 
@@ -41,7 +58,13 @@ def login(
     user: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(db_manager.get_db),
 ):
-    """
-    ...
+    """Authenticate a user and generate an access token.
+
+    Args:
+        user (OAuth2PasswordRequestForm, optional): Form containing username (email) and password.
+        db (Session, optional): Database session. Defaults via dependency injection.
+
+    Returns:
+        Token: JWT access token and type for authenticated session.
     """
     return auth_service_.login(db=db, email=user.username, password=user.password)

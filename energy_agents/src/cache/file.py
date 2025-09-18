@@ -1,4 +1,9 @@
-"""..."""
+"""
+File caching manager using Redis.
+
+Handles storing, retrieving, and deleting user file metadata and content.
+Uses pickle for serialization and applies TTL to cached entries.
+"""
 
 from dataclasses import dataclass
 from typing import Optional, Dict
@@ -14,14 +19,7 @@ from loaders.local import LocalLoader
 
 @dataclass
 class FileCacheManager:
-    """
-    Manages caching of user files in Redis.
-
-    - Connects to Redis and maintains a client session.
-    - Stores, retrieves, and deletes cached file metadata and data.
-    - Uses pickle for serialization/deserialization of Python objects.
-    - Applies TTL (time-to-live) to auto-expire cached entries.
-    """
+    """Manages caching of user files in Redis."""
 
     host: str
     port: int
@@ -71,61 +69,58 @@ class FileCacheManager:
 
     @staticmethod
     def format_key(user_id: int) -> str:
-        """
-        Format the key for storing/retrieving user files.
+        """Format the Redis key for a user's cached files.
 
         Args:
-            user_id (int): ID of the user.
+            user_id (int): User identifier.
 
         Returns:
-            str: Redis key.
+            str: Redis key string.
         """
         return f"files:user:{user_id}"
 
     def _update_cached_files(self, user_id: str, cached_files: Dict) -> None:
+        """Serialize and update the user's cached files in Redis.
+
+        Args:
+            user_id (str): User identifier.
+            cached_files (Dict): Dictionary of cached files.
+        """
         key = self.format_key(user_id=user_id)
         try:
-            # Serialize the cache dictionary and store in Redis
             self.client.set(key, pickle.dumps(cached_files))
-
-            # Reset TTL so the cache auto-expires
             self.client.expire(key, self.default_ttl)
 
         except RedisError:
             ...
 
     def get_cached_files(self, user_id: int) -> Optional[Dict]:
-        """
-        Retrieve cached files for a given user.
+        """Retrieve cached files for a user.
 
         Args:
-            user_id (int): The ID of the user.
+            user_id (int): User identifier.
 
         Returns:
-            dict: Cached files {file_name: FileData} or empty dict if none."""
+            Dict: Cached files mapping {file_name: FileData}, or empty dict if none.
+        """
         self._ensure_connected()
-        # Fetch raw serialized data
         key = self.format_key(user_id=user_id)
         cached_files = self.client.get(key)
-
-        # Deserialize pickle into Python dict or return empty dict
         return pickle.loads(cached_files) if cached_files else {}
 
     def add_file_to_cache(self, user_id: int, file_name: str, file_data: FileData):
-        """
-        Add a file to the user's cache.
+        """Add or update a file in the user's cache.
 
-        Steps:
-        1. Retrieve existing cached files.
-        2. Load file content (e.g., DataFrame) using loader.
-        3. Attach loaded content to `FileData`.
-        4. Add/update the file in the cache dictionary.
-        5. Save back to Redis with TTL.
+        Loads file content using the loader and attaches it to FileData.
+
+        Args:
+            user_id (int): User identifier.
+            file_name (str): Name of the file.
+            file_data (FileData): File metadata to cache.
         """
-        # Get existing cached files for this user
         cached_files = self.get_cached_files(user_id=user_id)
 
-        # Load file contents from storage
+        # Load file content from storage backend
         df = self.loader.load(file_data.storage_uri)
         file_data.df = df  # attach the loaded content to file metadata
 
@@ -139,13 +134,11 @@ class FileCacheManager:
         self._update_cached_files(user_id=user_id, cached_files=cached_files)
 
     def delete_file_from_cache(self, user_id: int, file_name: str):
-        """
-        Delete a specific file from the user's cache.
+        """Remove a specific file from the user's cache.
 
-        Steps:
-        1. Retrieve cached files.
-        2. Remove the given file if it exists.
-        3. Save the updated cache back to Redis.
+        Args:
+            user_id (int): User identifier.
+            file_name (str): Name of the file to remove.
         """
         # Get cached files
         cached_files = self.get_cached_files(user_id=user_id)
@@ -159,7 +152,7 @@ class FileCacheManager:
         self._update_cached_files(user_id=user_id, cached_files=cached_files)
 
 
-# Singleton instance of the file cache manager
+# Singleton instance for global use
 file_cache = FileCacheManager(
     host=settings.redis.HOST,
     port=settings.redis.PORT,
