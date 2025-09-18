@@ -55,7 +55,7 @@ low_temp_model = init_anthropic_chat_model(
 )
 
 mid_temp_model = init_anthropic_chat_model(
-    temperature=0.1,
+    temperature=0.2,
 )
 
 # Code generation model
