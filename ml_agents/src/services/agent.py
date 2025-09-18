@@ -1,4 +1,9 @@
-"""..."""
+"""
+Agent service module.
+
+Provides the AgentService class to convert base64 CSVs to DataFrames
+and interact with agent for analysis and visualization.
+"""
 
 import base64
 from io import StringIO
@@ -11,7 +16,7 @@ from agent.builder import agent
 from agent.tools.registry import tools_description
 
 
-# Predefined list of dependencies that the agent may use when executing dynamic code
+# Predefined dependencies for dynamic code execution
 dependencies = [
     "numpy",
     "pandas",
@@ -38,9 +43,11 @@ dependencies = [
 
 
 class AgentService:
+    """Service to handle CSV data and interact with the agent."""
+
     @staticmethod
     def _get_dfs(data: List[str]) -> List[pd.DataFrame]:
-        """..."""
+        """Convert base64 CSV strings to Pandas DataFrames."""
         dfs = []
         for df in data:
             csv_bytes = base64.b64decode(df)
@@ -56,8 +63,14 @@ class AgentService:
         data_summaries: List[str],
         data: List[str],
     ):
+        """Send question and data to agent; return analysis report and visualization."""
+        # Convert input data to DataFrames
         dfs = cls._get_dfs(data)
+
+        # Map DataFrames to their corresponding file names
         variables = {file_name: df for file_name, df in zip(file_names, dfs)}
+
+        # Invoke agent with question, data, and dependencies
         response = agent.invoke(
             {
                 "question": question,
@@ -66,19 +79,9 @@ class AgentService:
                 "dependencies": dependencies,
                 "tools": tools_description,
                 "agent_scratchpad": [HumanMessage(content=question)],
-                "current_debugging_attempt": 1,
-                "max_debugging_attempts": 5,
                 "visualization": None,
             }
         )
-        print("=" * 100)
-        print(
-            "VISUALIZATION: YES"
-            if response["visualization"] is not None
-            else "VISUALIZATION: NO"
-        )
-        print("* ANALYSIS REPORT:\n\n")
-        print(response["agent_scratchpad"][-1].content)
 
         return {
             "visualization": response["visualization"],

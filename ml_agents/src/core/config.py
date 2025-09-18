@@ -1,4 +1,9 @@
-""" """
+"""
+Configuration module.
+
+Defines application settings using Pydantic BaseSettings, including
+environment-based configuration and model-specific settings.
+"""
 
 from pathlib import Path
 
@@ -7,7 +12,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class BaseConfig(BaseSettings):
     """
-    ...
+    Base configuration with environment file support.
+
+    Loads environment variables from a `.env` file located three levels up
+    from this file and ignores extra values.
     """
 
     model_config = SettingsConfigDict(
@@ -16,17 +24,14 @@ class BaseConfig(BaseSettings):
 
 
 class AnthropicModelConfig(BaseConfig):
-    """
-    ...
-    """
+    """Configuration for Anthropic AI model access."""
 
-    ANTHROPIC_API_KEY: str | None = None
-    USE_AWS_BEDROCK: bool = False
+    ANTHROPIC_API_KEY: str
 
 
 class Settings(BaseSettings):
     """
-    ....
+    Application-wide settings container.
     """
 
     anthropic_model: AnthropicModelConfig = AnthropicModelConfig()

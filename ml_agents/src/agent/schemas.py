@@ -1,4 +1,9 @@
-"""..."""
+"""
+Model for generated Python code.
+
+Defines a structured container for storing Python code produced by an LLM.
+Ensures the code is directly executable and contains no explanations or metadata.
+"""
 
 from pydantic import BaseModel
 
