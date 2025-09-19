@@ -1189,40 +1189,31 @@ const ChatPage: React.FC = () => {
                       transition-all duration-300 ease-out animate-in slide-in-from-top-2
                     `}>
                       <div className="px-4 py-4">
-                        {/* Task Description Card */}
-                        <div className={`
-                          ${toolConfig.bgColor} rounded-xl p-4 border ${toolConfig.borderColor}
-                          transition-all duration-200 hover:shadow-sm
-                        `}>
-                          <div className="flex items-start space-x-3">
-                            {/* Tool Symbol */}
-                            <div className={`
-                              w-8 h-8 rounded-lg flex items-center justify-center text-sm font-mono font-bold
-                              ${toolConfig.color} bg-white shadow-sm
-                            `}>
-                              {getToolSymbol(part.tool!)}
-                            </div>
-
-                            {/* Description */}
-                            <div className="flex-1">
-                              {/* Check if part has multiple descriptions or single description */}
-                              {part.descriptions && part.descriptions.length > 0 ? (
-                                <div className="space-y-2">
-                                  {part.descriptions.map((desc, index) => (
-                                    <div key={index} className="flex items-start space-x-2">
-                                      <div className="w-1.5 h-1.5 bg-current rounded-full mt-2 flex-shrink-0"></div>
-                                      <div className="text-gray-800 text-sm leading-relaxed font-medium">
-                                        {desc}
-                                      </div>
+                        {/* Task Description - Enhanced formatting and visualization */}
+                        <div className="px-2 py-1">
+                          {/* Description */}
+                          <div>
+                            {/* Check if part has multiple descriptions or single description */}
+                            {part.descriptions && part.descriptions.length > 0 ? (
+                              <div className="space-y-3">
+                                {part.descriptions.map((desc, index) => (
+                                  <div key={index} className="flex items-start space-x-3 group hover:bg-gray-50/50 rounded-lg p-2 -m-2 transition-all duration-200">
+                                    <div className={`
+                                      w-2 h-2 rounded-full mt-2.5 flex-shrink-0
+                                      ${toolConfig.color.replace('text-', 'bg-')}
+                                      shadow-sm group-hover:scale-110 transition-transform duration-200
+                                    `}></div>
+                                    <div className="text-gray-900 text-sm leading-relaxed font-semibold tracking-normal">
+                                      <span className={`${toolConfig.color} font-bold`}>✦</span> {desc}
                                     </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="text-gray-800 text-sm leading-relaxed font-medium">
-                                  {part.description!}
-                                </div>
-                              )}
-                            </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-gray-900 text-sm leading-relaxed font-semibold tracking-normal p-2 hover:bg-gray-50/30 rounded-lg transition-all duration-200">
+                                <span className={`${toolConfig.color} font-bold`}>✦</span> {part.description!}
+                              </div>
+                            )}
                           </div>
                         </div>
 
