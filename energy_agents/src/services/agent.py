@@ -18,6 +18,11 @@ from agent.tools.registry import tools_description
 class AgentService:
     """Service for streaming responses from the agent."""
 
+    TOOL_NAMES_MAPPING: Dict[str, str] = {
+        "ml_agent": "ML Agent",
+        "insight_agent": "Insights Agent",
+    }
+
     @classmethod
     async def stream(
         cls,
@@ -56,7 +61,7 @@ class AgentService:
         ):
             # --- Tool usage events ---
             if chunk["event"] == "on_tool_start":
-                tool_name = chunk["name"]
+                tool_name = cls.TOOL_NAMES_MAPPING[chunk["name"]]
                 task = chunk["data"]["input"].get("task", question)
                 yield f"data: {json.dumps({'type': 'tool_start', 'tool': tool_name, 'description': task})}\n\n"
 

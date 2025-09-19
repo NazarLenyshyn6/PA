@@ -399,6 +399,9 @@ const ChatPage: React.FC = () => {
                         [assistantMessageId]: updatedTools
                       };
                     });
+
+                    // Force immediate UI update by updating messages to trigger re-render
+                    setMessages(prev => [...prev]);
                   }
                 } catch (error) {
                   // If JSON parsing fails, treat as plain text
@@ -1043,13 +1046,24 @@ const ChatPage: React.FC = () => {
       const messageTools = toolHistoryByMessage[messageId] || [];
       const toolHistory = messageTools.find(t => t.tool === marker.tool);
 
+      // Check if this specific tool is completed by looking for content after its marker
+      const toolEndPosition = marker.index + marker.length;
+      const contentAfterTool = cleanContent.substring(toolEndPosition);
+      const hasContentAfter = contentAfterTool.trim().length > 0;
+
+      // Tool is active (running) only if:
+      // 1. We're currently streaming AND
+      // 2. This specific tool is in activeTools AND
+      // 3. There's no content after this tool marker
+      const toolIsActive = isStreaming && activeTools.has(marker.toolId) && !hasContentAfter;
+
       // Add tool marker with descriptions array if available
       parts.push({
         type: 'tool',
         tool: marker.tool,
         description: marker.description,
         descriptions: toolHistory?.descriptions || [marker.description],
-        isActive: isStreaming && activeTools.has(marker.toolId),
+        isActive: toolIsActive,
         key: `${contentId}-tool-${marker.toolId}-${markerIndex}`
       });
 
@@ -1820,6 +1834,9 @@ const ChatPage: React.FC = () => {
                         [currentMessageId]: updatedTools
                       };
                     });
+
+                    // Force immediate UI update by updating messages to trigger re-render
+                    setMessages(prev => [...prev]);
                   }
                 } catch (error) {
                   // If JSON parsing fails, treat as plain text
@@ -2138,8 +2155,8 @@ const ChatPage: React.FC = () => {
                                 hour: '2-digit',
                                 minute: '2-digit'
                               })}
-                              {/* Show AI is responding indicator only for currently streaming message */}
-                              {isLoading && currentStreamingMessageId === message.id && (
+                              {/* Show AI is responding indicator only for currently streaming message and when tools are active */}
+                              {isLoading && currentStreamingMessageId === message.id && activeTools.size > 0 && (
                                 <>
                                   <span className="mx-2">•</span>
                                   <span className="text-green-500 animate-pulse">AI is responding...</span>
