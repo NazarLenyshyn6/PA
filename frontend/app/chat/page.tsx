@@ -1094,15 +1094,12 @@ const ChatPage: React.FC = () => {
                   {/* Enhanced Tool Card with Visual Boundaries */}
                   <div className={`
                     relative overflow-hidden transition-all duration-300 ease-out
-                    ${isRunning
-                      ? `shadow-lg hover:shadow-xl ${toolConfig.bgColor} ${toolConfig.borderColor} border-2`
-                      : `shadow-md hover:shadow-lg bg-white border ${toolConfig.borderColor} hover:${toolConfig.bgColor}`
-                    }
+                    shadow-md hover:shadow-lg ${toolConfig.bgColor} border ${toolConfig.borderColor} hover:${toolConfig.bgColor}
                     ${isExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}
                   `}>
 
                     {/* Status indicator bar */}
-                    <div className={`h-1 w-full ${isRunning ? 'bg-gradient-to-r from-blue-400 to-purple-500' : toolConfig.color.replace('text-', 'bg-')}`}>
+                    <div className={`h-1 w-full ${toolConfig.color.replace('text-', 'bg-')}`}>
                       {isRunning && (
                         <div className="h-full bg-white/30 animate-pulse"></div>
                       )}
