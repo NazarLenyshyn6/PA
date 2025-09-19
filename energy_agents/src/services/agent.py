@@ -54,8 +54,24 @@ class AgentService:
                 "agent_scratchpad": [HumanMessage(content=question)],
             }
         ):
+            # --- Tool usage events ---
+            if chunk["event"] == "on_tool_start":
+                tool_name = chunk["name"]
+                task = (
+                    chunk["data"]["input"]["task"]
+                    if chunk["name"] == "ml_agent"
+                    else question
+                )
+                print(tool_name)
+                print(task)
+                yield f"data: {json.dumps({'type': 'tool_start', 'tool': tool_name, 'description': task})}\n\n"
+
+            elif chunk["event"] == "on_tool_end":
+                tool_name = chunk.get("name", "unknown_tool")
+                yield f"data: {json.dumps({'type': 'tool_end', 'tool': tool_name})}\n\n"
+
             # Yield image at the end of a chain
-            if (
+            elif (
                 chunk["metadata"].get("image", False)
                 and chunk["event"] == "on_chain_end"
                 and chunk["data"].get("output", False)
@@ -64,6 +80,6 @@ class AgentService:
                 yield f"data: {json.dumps({'type': 'image', 'data': data})}\n\n"
 
             # Stream incremental text outputs
-            if chunk["event"] == "on_chat_model_stream":
+            elif chunk["event"] == "on_chat_model_stream":
                 data = chunk["data"]["chunk"].content[0].get("text", "")
                 yield f"data: {json.dumps({'type': 'text', 'data': f"{data}"})}\n\n"

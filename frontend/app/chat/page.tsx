@@ -13,6 +13,24 @@ interface Message {
   timestamp: string;
 }
 
+interface ToolMessage {
+  id: string;
+  type: 'tool';
+  tool: string;
+  descriptions: string[];
+  isActive: boolean;
+  timestamp: string;
+}
+
+// Type guards
+const isMessage = (item: any): item is Message => {
+  return 'role' in item && item.role !== undefined;
+};
+
+const isToolMessage = (item: any): item is ToolMessage => {
+  return 'type' in item && item.type === 'tool';
+};
+
 interface ChatHistoryItem {
   question: string;
   answer: string | string[];
@@ -31,7 +49,7 @@ interface FileItem {
 
 const ChatPage: React.FC = () => {
   const router = useRouter();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<(Message | ToolMessage)[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
@@ -53,6 +71,12 @@ const ChatPage: React.FC = () => {
   const [streamingMessage, setStreamingMessage] = useState('');
   const [lastChunkTime, setLastChunkTime] = useState<number>(0);
   const [currentStreamingMessageId, setCurrentStreamingMessageId] = useState<string | null>(null);
+  // Tool execution tracking - each tool call gets unique ID
+  const [activeTools, setActiveTools] = useState<Map<string, {toolId: string, tool: string, description: string}>>(new Map());
+  const [toolHistoryByMessage, setToolHistoryByMessage] = useState<Record<string, Array<{tool: string, descriptions: string[], isActive: boolean}>>>({});
+  const [expandedToolTabs, setExpandedToolTabs] = useState<Set<string>>(new Set());
+  // Tool messages are now part of the messages array
+  const [postToolMessageId, setPostToolMessageId] = useState<string | null>(null);
   const [showDeleteFileModal, setShowDeleteFileModal] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<FileItem | null>(null);
   const [deletingFile, setDeletingFile] = useState(false);
@@ -138,7 +162,7 @@ const ChatPage: React.FC = () => {
     if (isLoading) return; // Don't allow if already loading
     
     // Find the last user message
-    const lastUserMessage = [...messages].reverse().find(msg => msg.role === 'user');
+    const lastUserMessage = [...messages].reverse().find(msg => isMessage(msg) && msg.role === 'user') as Message | undefined;
     if (!lastUserMessage || !lastUserMessage.content.trim()) return;
 
     // Create a new user message with the same content
@@ -153,6 +177,11 @@ const ChatPage: React.FC = () => {
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     setStreamingMessage('');
+    // Clear all active tools for new message
+    setActiveTools(new Map());
+    // Tool messages are now part of the messages array
+    // Clear post-tool message state
+    setPostToolMessageId(null);
 
     // Create initial assistant message for streaming
     const assistantMessageId = (Date.now() + 1).toString();
@@ -195,6 +224,8 @@ const ChatPage: React.FC = () => {
             const { done, value } = await reader.read();
             if (done) {
               setCurrentStreamingMessageId(null);
+              // Clear all active tools when streaming ends
+              setActiveTools(new Map());
               // Auto-collapse Python code blocks when execution finishes
               setExpandedPythonBlocks(new Set());
               setTimeout(() => {
@@ -242,6 +273,71 @@ const ChatPage: React.FC = () => {
                     // Handle image data - convert base64 to data URI if needed
                     const imageData = jsonData.data.startsWith('data:') ? jsonData.data : `data:image/png;base64,${jsonData.data}`;
                     currentContent += `\n![Generated Image](${imageData})\n`;
+                  } else if (jsonData.type === 'tool_start') {
+                    // Handle tool start event for resend
+                    const toolName = jsonData.tool;
+                    const toolDescription = jsonData.description;
+
+                    // Create unique tool ID for this call
+                    const toolId = `${toolName}-${Date.now()}-${Math.random()}`;
+
+                    // Update active tools map with unique ID
+                    setActiveTools(prev => new Map(prev).set(toolId, {toolId, tool: toolName, description: toolDescription}));
+
+                    // Tool content will be handled in the message content itself
+                    // Add tool marker to content for inline processing (include unique ID)
+                    const toolMarker = `\n\n__TOOL_START__${toolId}|${toolName}|${toolDescription}__TOOL_END__\n\n`;
+                    currentContent += toolMarker;
+
+                    setToolHistoryByMessage(prev => {
+                      const messageTools = prev[assistantMessageId] || [];
+                      const existingToolIndex = messageTools.findIndex(t => t.tool === toolName && t.isActive);
+
+                      let updatedTools;
+                      if (existingToolIndex >= 0) {
+                        updatedTools = [...messageTools];
+                        updatedTools[existingToolIndex].descriptions.push(toolDescription);
+                      } else {
+                        updatedTools = [...messageTools, {tool: toolName, descriptions: [toolDescription], isActive: true}];
+                      }
+
+                      return {
+                        ...prev,
+                        [assistantMessageId]: updatedTools
+                      };
+                    });
+                  } else if (jsonData.type === 'tool_end') {
+                    // Handle tool end event for resend
+                    const toolName = jsonData.tool;
+
+                    // Remove tool from active tools map (find by tool name since tool_end doesn't provide ID)
+                    setActiveTools(prev => {
+                      const newMap = new Map(prev);
+                      // Find and remove the first active tool with matching name
+                      for (const [toolId, toolInfo] of Array.from(newMap.entries())) {
+                        if (toolInfo.tool === toolName) {
+                          newMap.delete(toolId);
+                          break; // Only remove one instance
+                        }
+                      }
+                      return newMap;
+                    });
+
+                    // Tool end is just a state update - no content added to stream
+
+                    setToolHistoryByMessage(prev => {
+                      const messageTools = prev[assistantMessageId] || [];
+                      const updatedTools = messageTools.map(t =>
+                        t.tool === toolName && t.isActive
+                          ? {...t, isActive: false}
+                          : t
+                      );
+
+                      return {
+                        ...prev,
+                        [assistantMessageId]: updatedTools
+                      };
+                    });
                   }
                 } catch (error) {
                   // If JSON parsing fails, treat as plain text
@@ -299,6 +395,8 @@ const ChatPage: React.FC = () => {
       setIsLoading(false);
       setStreamingMessage('');
       setCurrentStreamingMessageId(null);
+      // Clear all active tools when streaming ends
+      setActiveTools(new Map());
     }
   };
 
@@ -333,6 +431,19 @@ const ChatPage: React.FC = () => {
         newSet.delete(codeId);
       } else {
         newSet.add(codeId);
+      }
+      return newSet;
+    });
+  };
+
+  // Toggle tool tab expand/collapse state
+  const toggleToolTab = (toolName: string) => {
+    setExpandedToolTabs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(toolName)) {
+        newSet.delete(toolName); // Was expanded, now collapse
+      } else {
+        newSet.add(toolName); // Was collapsed, now expand
       }
       return newSet;
     });
@@ -758,7 +869,7 @@ const ChatPage: React.FC = () => {
   // Auto-collapse ALL code blocks by default (always closed everywhere)
   useEffect(() => {
     messages.forEach(message => {
-      if (message.role === 'assistant' && message.content) {
+      if (isMessage(message) && message.role === 'assistant' && message.content) {
         // Check if this is currently streaming
         const isCurrentlyStreaming = isLoading && currentStreamingMessageId === message.id;
         
@@ -795,13 +906,14 @@ const ChatPage: React.FC = () => {
     });
   }, [messages, isLoading, currentStreamingMessageId]);
 
-  // Render entire message content with logic block separators
+  // Render entire message content with logic block separators and tool blocks
   const renderMessageWithSeparators = (content: string, messageId: string, isStreaming = false) => {
     // First split by ___ to create logic blocks
     const logicBlocks = content.split(/___+/);
-    
+
     return (
       <div className="prose max-w-none">
+        {/* Render message content blocks with inline tools */}
         {logicBlocks.map((blockContent, blockIndex) => (
           <React.Fragment key={blockIndex}>
             {blockIndex > 0 && (
@@ -809,10 +921,202 @@ const ChatPage: React.FC = () => {
                 <div className="h-px bg-gray-300 opacity-60"></div>
               </div>
             )}
-            {renderMessageContent(blockContent.trim(), `${messageId}-block-${blockIndex}`, isStreaming)}
+            {renderMessageContentWithTools(blockContent.trim(), `${messageId}-block-${blockIndex}`, isStreaming)}
           </React.Fragment>
         ))}
       </div>
+    );
+  };
+
+  // Render message content with inline tool blocks
+  const renderMessageContentWithTools = (content: string, contentId: string, isStreaming = false) => {
+    // First, clean up any tool_end markers from content (they're just state updates, not UI elements)
+    let cleanContent = content.replace(/__TOOL_END__[^_]+__TOOL_END__/g, '');
+
+    // Parse cleaned content for tool start markers only
+    const parts: Array<{
+      type: 'text' | 'tool';
+      content?: string;
+      tool?: string;
+      description?: string;
+      isActive?: boolean;
+      key: string;
+    }> = [];
+    let currentIndex = 0;
+
+    // Split content by tool start markers only (now includes toolId|toolName|description)
+    const toolStartRegex = /__TOOL_START__([^|]+)\|([^|]+)\|(.*?)__TOOL_END__/g;
+    const markers = [];
+    let match;
+
+    while ((match = toolStartRegex.exec(cleanContent)) !== null) {
+      markers.push({
+        index: match.index,
+        length: match[0].length,
+        type: 'start',
+        toolId: match[1],
+        tool: match[2],
+        description: match[3]
+      });
+    }
+
+    // Process content with markers
+    markers.forEach((marker, markerIndex) => {
+      // Add text before this marker
+      if (marker.index > currentIndex) {
+        const textContent = cleanContent.substring(currentIndex, marker.index);
+        if (textContent.trim()) {
+          parts.push({
+            type: 'text',
+            content: textContent,
+            key: `${contentId}-text-${markerIndex}`
+          });
+        }
+      }
+
+      // Add tool marker
+      parts.push({
+        type: 'tool',
+        tool: marker.tool,
+        description: marker.description,
+        isActive: isStreaming && activeTools.has(marker.toolId),
+        key: `${contentId}-tool-${marker.toolId}-${markerIndex}`
+      });
+
+      currentIndex = marker.index + marker.length;
+    });
+
+    // Add remaining text after last marker
+    if (currentIndex < cleanContent.length) {
+      const remainingContent = cleanContent.substring(currentIndex);
+      if (remainingContent.trim()) {
+        parts.push({
+          type: 'text',
+          content: remainingContent,
+          key: `${contentId}-text-final`
+        });
+      }
+    }
+
+    // If no tools found, render as normal content
+    if (parts.length === 0 || parts.every(p => p.type === 'text')) {
+      return renderMessageContent(cleanContent, contentId, isStreaming);
+    }
+
+    // Render all parts
+    return (
+      <>
+        {parts.map((part) => {
+          if (part.type === 'text' && part.content) {
+            return (
+              <div key={part.key}>
+                {renderMessageContent(part.content, part.key, isStreaming)}
+              </div>
+            );
+          } else if (part.type === 'tool' && part.tool! && part.description!) {
+            const isExpanded = expandedToolTabs.has(part.tool!);
+            const isRunning = part.isActive;
+
+            return (
+              <div key={part.key} className="my-6">
+                <div className="relative">
+                  {/* Tool execution indicator */}
+                  <div className="flex items-center mb-2">
+                    <div className={`w-2 h-2 rounded-full mr-2 ${isRunning ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`}></div>
+                    <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+                      {isRunning ? 'Tool Executing' : 'Tool Completed'}
+                    </span>
+                  </div>
+
+                  {/* Main tool tab */}
+                  <div
+                    className={`bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border-2 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md ${
+                      isRunning
+                        ? 'border-green-300 shadow-green-100'
+                        : 'border-blue-200 hover:border-blue-300'
+                    } ${isExpanded ? 'rounded-t-xl border-b-0' : 'rounded-xl'}`}
+                    onClick={() => toggleToolTab(part.tool!)}
+                  >
+                    <div className="px-4 py-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          {/* Tool icon */}
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                            isRunning
+                              ? 'bg-green-100 text-green-600'
+                              : 'bg-blue-100 text-blue-600'
+                          }`}>
+                            <Zap className="w-4 h-4" />
+                          </div>
+
+                          {/* Tool info */}
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-semibold text-gray-800 text-sm">
+                                🔧 {part.tool!}
+                              </span>
+                              {isRunning && (
+                                <div className="flex items-center space-x-1">
+                                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                                </div>
+                              )}
+                            </div>
+                            {!isExpanded && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                Click to view task details • 1 task
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Expand/collapse button */}
+                        <div className={`p-1.5 rounded-lg transition-colors ${
+                          isExpanded
+                            ? 'bg-blue-200 text-blue-700'
+                            : 'bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600'
+                        }`}>
+                          {isExpanded ? (
+                            <ChevronDown className="w-4 h-4" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expanded content */}
+                  {isExpanded && (
+                    <div className="bg-white border-2 border-t-0 border-blue-200 rounded-b-xl shadow-sm">
+                      <div className="px-4 py-4">
+                        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                          <div className="flex items-start space-x-3">
+                            <span className="text-blue-500 font-bold text-base leading-none mt-0.5 select-none">*</span>
+                            <div className="flex-1">
+                              <div className="text-gray-700 text-sm leading-relaxed font-medium">
+                                {part.description!}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        {isRunning && (
+                          <div className="mt-3 flex items-center space-x-2 text-xs text-gray-500">
+                            <div className="w-4 h-4 border-2 border-green-300 border-t-transparent rounded-full animate-spin"></div>
+                            <span>Executing...</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })}
+      </>
     );
   };
 
@@ -1194,6 +1498,11 @@ const ChatPage: React.FC = () => {
     setInputMessage('');
     setIsLoading(true);
     setStreamingMessage('');
+    // Clear all active tools for new message
+    setActiveTools(new Map());
+    // Tool messages are now part of the messages array
+    // Clear post-tool message state
+    setPostToolMessageId(null);
 
     // Create initial assistant message for streaming
     const assistantMessageId = (Date.now() + 1).toString();
@@ -1246,10 +1555,12 @@ const ChatPage: React.FC = () => {
             if (done) {
               console.log(`✅ Streaming completed. Total chunks: ${chunkCount}, Final content length: ${fullContent.length}`);
               setCurrentStreamingMessageId(null);
-              
+              // Clear all active tools when streaming ends
+              setActiveTools(new Map());
+
               // Auto-collapse all Python code blocks when execution finishes
               setExpandedPythonBlocks(new Set());
-              
+
               // Use a timeout to ensure the final message updates are processed
               setTimeout(() => {
                 setCollapsedCodeBlocks(prev => {
@@ -1270,7 +1581,7 @@ const ChatPage: React.FC = () => {
                   return newSet;
                 });
               }, 100); // Small delay to ensure message state is updated
-              
+
               break;
             }
 
@@ -1315,6 +1626,83 @@ const ChatPage: React.FC = () => {
                     if (DEBUG_STREAMING) {
                       console.log(`🖼️ Added image with data URI, length:`, imageData.length);
                     }
+                  } else if (jsonData.type === 'tool_start') {
+                    // Handle tool start event
+                    const toolName = jsonData.tool;
+                    const toolDescription = jsonData.description;
+
+                    if (DEBUG_STREAMING) {
+                      console.log(`🔧 Tool started:`, toolName, toolDescription);
+                    }
+
+                    // Create unique tool ID for this call
+                    const toolId = `${toolName}-${Date.now()}-${Math.random()}`;
+
+                    // Update active tools map with unique ID
+                    setActiveTools(prev => new Map(prev).set(toolId, {toolId, tool: toolName, description: toolDescription}));
+
+                    // Tool content will be handled in the message content itself
+                    // Add tool marker to content for inline processing (include unique ID)
+                    const toolMarker = `\n\n__TOOL_START__${toolId}|${toolName}|${toolDescription}__TOOL_END__\n\n`;
+                    currentContent += toolMarker;
+
+                    // Update tool history for current message
+                    setToolHistoryByMessage(prev => {
+                      const messageTools = prev[currentMessageId] || [];
+                      const existingToolIndex = messageTools.findIndex(t => t.tool === toolName && t.isActive);
+
+                      let updatedTools;
+                      if (existingToolIndex >= 0) {
+                        // Add to existing active tool
+                        updatedTools = [...messageTools];
+                        updatedTools[existingToolIndex].descriptions.push(toolDescription);
+                      } else {
+                        // Create new tool entry
+                        updatedTools = [...messageTools, {tool: toolName, descriptions: [toolDescription], isActive: true}];
+                      }
+
+                      return {
+                        ...prev,
+                        [currentMessageId]: updatedTools
+                      };
+                    });
+                  } else if (jsonData.type === 'tool_end') {
+                    // Handle tool end event
+                    const toolName = jsonData.tool;
+
+                    if (DEBUG_STREAMING) {
+                      console.log(`🔧 Tool ended:`, toolName);
+                    }
+
+                    // Remove tool from active tools map (find by tool name since tool_end doesn't provide ID)
+                    setActiveTools(prev => {
+                      const newMap = new Map(prev);
+                      // Find and remove the first active tool with matching name
+                      for (const [toolId, toolInfo] of Array.from(newMap.entries())) {
+                        if (toolInfo.tool === toolName) {
+                          newMap.delete(toolId);
+                          break; // Only remove one instance
+                        }
+                      }
+                      return newMap;
+                    });
+
+                    // Tool end is just a state update - no content added to stream
+
+                    // Mark tool as inactive in history for current message
+                    setToolHistoryByMessage(prev => {
+                      const messageTools = prev[currentMessageId] || [];
+                      const updatedTools = messageTools.map(t =>
+                        t.tool === toolName && t.isActive
+                          ? {...t, isActive: false}
+                          : t
+                      );
+
+                      return {
+                        ...prev,
+                        [currentMessageId]: updatedTools
+                      };
+                    });
                   }
                 } catch (error) {
                   // If JSON parsing fails, treat as plain text
@@ -1387,6 +1775,8 @@ const ChatPage: React.FC = () => {
       setStreamingMessage('');
       setLastChunkTime(0);
       setCurrentStreamingMessageId(null);
+      // Clear all active tools when streaming ends
+      setActiveTools(new Map());
     }
   };
 
@@ -1531,8 +1921,10 @@ const ChatPage: React.FC = () => {
             <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
               {messages.map((message) => (
                 <div key={message.id}>
+                  {/* Tool messages are now rendered inline within message content */}
+
                   {/* User message - standalone, aligned right */}
-                  {message.role === 'user' && (
+                  {isMessage(message) && message.role === 'user' && (
                     <div className="flex justify-end mb-6 transition-all duration-300">
                       <div className="max-w-2xl">
                         <div className="bg-white text-gray-800 rounded-2xl px-5 py-3.5 shadow-medium hover:shadow-strong transition-all duration-200 border border-gray-200">
@@ -1551,7 +1943,7 @@ const ChatPage: React.FC = () => {
                   )}
                   
                   {/* AI response - floating with light borders */}
-                  {message.role === 'assistant' && (
+                  {isMessage(message) && message.role === 'assistant' && (
                     <div className="flex justify-start mb-8">
                       <div className="max-w-4xl w-full group">
                         
@@ -1644,8 +2036,9 @@ const ChatPage: React.FC = () => {
                   )}
                 </div>
               ))}
-              
-              
+
+              {/* Tools are now rendered inline within message content */}
+
               <div ref={messagesEndRef} />
             </div>
           )}
