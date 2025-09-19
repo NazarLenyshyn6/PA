@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Plus, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, Trash2, Info, ChevronDown, ChevronRight, Move, Maximize2, Minimize2, RefreshCw, BookOpen, Download, X } from 'lucide-react';
+import { Send, Plus, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, Trash2, Info, ChevronDown, ChevronRight, Move, Maximize2, Minimize2, RefreshCw, BookOpen, Download, X, Terminal, Edit, Search, Globe, List, Monitor } from 'lucide-react';
 import { apiEndpoints, getAuthHeaders } from '@/lib/api';
 
 
@@ -29,6 +29,67 @@ const isMessage = (item: any): item is Message => {
 
 const isToolMessage = (item: any): item is ToolMessage => {
   return 'type' in item && item.type === 'tool';
+};
+
+const getToolSymbol = (toolName: string): string => {
+  const toolSymbols: Record<string, string> = {
+    'Bash': '$',
+    'Read': '>',
+    'Write': '+',
+    'Edit': '~',
+    'MultiEdit': '~',
+    'Grep': '?',
+    'Glob': '*',
+    'WebFetch': '@',
+    'WebSearch': '/',
+    'Task': '&',
+    'TodoWrite': '-',
+    'NotebookEdit': '#',
+    'BashOutput': '|',
+    'KillShell': 'x',
+    'ExitPlanMode': '!'
+  };
+  return toolSymbols[toolName] || '*';
+};
+
+const getToolConfig = (toolName: string) => {
+  const configs: Record<string, { color: string; bgColor: string; borderColor: string; icon: string }> = {
+    'Bash': { color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200', icon: 'terminal' },
+    'Read': { color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200', icon: 'file' },
+    'Write': { color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200', icon: 'plus' },
+    'Edit': { color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200', icon: 'edit' },
+    'MultiEdit': { color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200', icon: 'edit' },
+    'Grep': { color: 'text-amber-600', bgColor: 'bg-amber-50', borderColor: 'border-amber-200', icon: 'search' },
+    'Glob': { color: 'text-amber-600', bgColor: 'bg-amber-50', borderColor: 'border-amber-200', icon: 'search' },
+    'WebFetch': { color: 'text-indigo-600', bgColor: 'bg-indigo-50', borderColor: 'border-indigo-200', icon: 'globe' },
+    'WebSearch': { color: 'text-indigo-600', bgColor: 'bg-indigo-50', borderColor: 'border-indigo-200', icon: 'search' },
+    'Task': { color: 'text-pink-600', bgColor: 'bg-pink-50', borderColor: 'border-pink-200', icon: 'zap' },
+    'TodoWrite': { color: 'text-teal-600', bgColor: 'bg-teal-50', borderColor: 'border-teal-200', icon: 'list' },
+    'NotebookEdit': { color: 'text-violet-600', bgColor: 'bg-violet-50', borderColor: 'border-violet-200', icon: 'book' },
+    'BashOutput': { color: 'text-gray-600', bgColor: 'bg-gray-50', borderColor: 'border-gray-200', icon: 'monitor' },
+    'KillShell': { color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200', icon: 'x' },
+    'ExitPlanMode': { color: 'text-emerald-600', bgColor: 'bg-emerald-50', borderColor: 'border-emerald-200', icon: 'check' }
+  };
+  return configs[toolName] || { color: 'text-slate-600', bgColor: 'bg-slate-50', borderColor: 'border-slate-200', icon: 'zap' };
+};
+
+const getToolIcon = (iconType: string, className: string = "w-4 h-4") => {
+  const iconMap: Record<string, React.ComponentType<any>> = {
+    terminal: Terminal,
+    file: File,
+    plus: Plus,
+    edit: Edit,
+    search: Search,
+    globe: Globe,
+    zap: Zap,
+    list: List,
+    book: BookOpen,
+    monitor: Monitor,
+    x: X,
+    check: Check
+  };
+  const IconComponent = iconMap[iconType] || Zap;
+  return <IconComponent className={className} />;
 };
 
 interface ChatHistoryItem {
@@ -933,12 +994,16 @@ const ChatPage: React.FC = () => {
     // First, clean up any tool_end markers from content (they're just state updates, not UI elements)
     let cleanContent = content.replace(/__TOOL_END__[^_]+__TOOL_END__/g, '');
 
+    // Extract messageId from contentId to access tool history
+    const messageId = contentId.split('-')[0];
+
     // Parse cleaned content for tool start markers only
     const parts: Array<{
       type: 'text' | 'tool';
       content?: string;
       tool?: string;
       description?: string;
+      descriptions?: string[];
       isActive?: boolean;
       key: string;
     }> = [];
@@ -974,11 +1039,16 @@ const ChatPage: React.FC = () => {
         }
       }
 
-      // Add tool marker
+      // Get all descriptions for this tool from toolHistoryByMessage
+      const messageTools = toolHistoryByMessage[messageId] || [];
+      const toolHistory = messageTools.find(t => t.tool === marker.tool);
+
+      // Add tool marker with descriptions array if available
       parts.push({
         type: 'tool',
         tool: marker.tool,
         description: marker.description,
+        descriptions: toolHistory?.descriptions || [marker.description],
         isActive: isStreaming && activeTools.has(marker.toolId),
         key: `${contentId}-tool-${marker.toolId}-${markerIndex}`
       });
@@ -1016,67 +1086,92 @@ const ChatPage: React.FC = () => {
           } else if (part.type === 'tool' && part.tool! && part.description!) {
             const isExpanded = expandedToolTabs.has(part.tool!);
             const isRunning = part.isActive;
+            const toolConfig = getToolConfig(part.tool!);
 
             return (
               <div key={part.key} className="my-6">
                 <div className="relative">
-                  {/* Tool execution indicator */}
-                  <div className="flex items-center mb-2">
-                    <div className={`w-2 h-2 rounded-full mr-2 ${isRunning ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`}></div>
-                    <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                      {isRunning ? 'Tool Executing' : 'Tool Completed'}
-                    </span>
-                  </div>
+                  {/* Enhanced Tool Card with Visual Boundaries */}
+                  <div className={`
+                    relative overflow-hidden transition-all duration-300 ease-out
+                    ${isRunning
+                      ? `shadow-lg hover:shadow-xl ${toolConfig.bgColor} ${toolConfig.borderColor} border-2`
+                      : `shadow-md hover:shadow-lg bg-white border ${toolConfig.borderColor} hover:${toolConfig.bgColor}`
+                    }
+                    ${isExpanded ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}
+                  `}>
 
-                  {/* Main tool tab */}
-                  <div
-                    className={`bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border-2 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md ${
-                      isRunning
-                        ? 'border-green-300 shadow-green-100'
-                        : 'border-blue-200 hover:border-blue-300'
-                    } ${isExpanded ? 'rounded-t-xl border-b-0' : 'rounded-xl'}`}
-                    onClick={() => toggleToolTab(part.tool!)}
-                  >
-                    <div className="px-4 py-3">
+                    {/* Status indicator bar */}
+                    <div className={`h-1 w-full ${isRunning ? 'bg-gradient-to-r from-blue-400 to-purple-500' : toolConfig.color.replace('text-', 'bg-')}`}>
+                      {isRunning && (
+                        <div className="h-full bg-white/30 animate-pulse"></div>
+                      )}
+                    </div>
+
+                    {/* Main tool header - clickable */}
+                    <div
+                      className="px-4 py-4 cursor-pointer transition-all duration-200 hover:bg-white/50"
+                      onClick={() => toggleToolTab(part.tool!)}
+                    >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          {/* Tool icon */}
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                            isRunning
-                              ? 'bg-green-100 text-green-600'
-                              : 'bg-blue-100 text-blue-600'
-                          }`}>
-                            <Zap className="w-4 h-4" />
+                        <div className="flex items-center space-x-4">
+                          {/* Enhanced Tool Icon */}
+                          <div className={`
+                            w-10 h-10 rounded-xl flex items-center justify-center shadow-sm transition-all duration-200
+                            ${isRunning
+                              ? `${toolConfig.color} bg-white shadow-md animate-pulse`
+                              : `${toolConfig.color} ${toolConfig.bgColor} hover:scale-105`
+                            }
+                          `}>
+                            {getToolIcon(toolConfig.icon, "w-5 h-5")}
                           </div>
 
-                          {/* Tool info */}
+                          {/* Tool Info */}
                           <div className="flex-1">
-                            <div className="flex items-center space-x-2">
-                              <span className="font-semibold text-gray-800 text-sm">
-                                🔧 {part.tool!}
+                            <div className="flex items-center space-x-3">
+                              <span className={`font-bold text-base ${toolConfig.color}`}>
+                                {part.tool!}
                               </span>
-                              {isRunning && (
-                                <div className="flex items-center space-x-1">
-                                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
-                                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                                </div>
-                              )}
+
+                              {/* Enhanced Status Badge */}
+                              <div className={`
+                                px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200
+                                ${isRunning
+                                  ? 'bg-blue-100 text-blue-700 animate-pulse'
+                                  : 'bg-emerald-100 text-emerald-700'
+                                }
+                              `}>
+                                {isRunning ? (
+                                  <div className="flex items-center space-x-1">
+                                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
+                                    <span>Running</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center space-x-1">
+                                    <Check className="w-3 h-3" />
+                                    <span>Completed</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
+
+                            {/* Task Preview */}
                             {!isExpanded && (
-                              <div className="text-xs text-gray-500 mt-1">
-                                Click to view task details • 1 task
+                              <div className="text-sm text-gray-600 mt-1 font-medium">
+                                Click to view task details
                               </div>
                             )}
                           </div>
                         </div>
 
-                        {/* Expand/collapse button */}
-                        <div className={`p-1.5 rounded-lg transition-colors ${
-                          isExpanded
-                            ? 'bg-blue-200 text-blue-700'
-                            : 'bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600'
-                        }`}>
+                        {/* Enhanced Expand/Collapse Button */}
+                        <div className={`
+                          p-2 rounded-xl transition-all duration-200 hover:scale-105
+                          ${isExpanded
+                            ? `${toolConfig.color} ${toolConfig.bgColor}`
+                            : `${toolConfig.color} hover:${toolConfig.bgColor}`
+                          }
+                        `}>
                           {isExpanded ? (
                             <ChevronDown className="w-4 h-4" />
                           ) : (
@@ -1087,24 +1182,58 @@ const ChatPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Expanded content */}
+                  {/* Enhanced Expanded Content */}
                   {isExpanded && (
-                    <div className="bg-white border-2 border-t-0 border-blue-200 rounded-b-xl shadow-sm">
+                    <div className={`
+                      bg-white border-2 border-t-0 ${toolConfig.borderColor} rounded-b-2xl shadow-lg
+                      transition-all duration-300 ease-out animate-in slide-in-from-top-2
+                    `}>
                       <div className="px-4 py-4">
-                        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                        {/* Task Description Card */}
+                        <div className={`
+                          ${toolConfig.bgColor} rounded-xl p-4 border ${toolConfig.borderColor}
+                          transition-all duration-200 hover:shadow-sm
+                        `}>
                           <div className="flex items-start space-x-3">
-                            <span className="text-blue-500 font-bold text-base leading-none mt-0.5 select-none">*</span>
+                            {/* Tool Symbol */}
+                            <div className={`
+                              w-8 h-8 rounded-lg flex items-center justify-center text-sm font-mono font-bold
+                              ${toolConfig.color} bg-white shadow-sm
+                            `}>
+                              {getToolSymbol(part.tool!)}
+                            </div>
+
+                            {/* Description */}
                             <div className="flex-1">
-                              <div className="text-gray-700 text-sm leading-relaxed font-medium">
-                                {part.description!}
-                              </div>
+                              {/* Check if part has multiple descriptions or single description */}
+                              {part.descriptions && part.descriptions.length > 0 ? (
+                                <div className="space-y-2">
+                                  {part.descriptions.map((desc, index) => (
+                                    <div key={index} className="flex items-start space-x-2">
+                                      <div className="w-1.5 h-1.5 bg-current rounded-full mt-2 flex-shrink-0"></div>
+                                      <div className="text-gray-800 text-sm leading-relaxed font-medium">
+                                        {desc}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-gray-800 text-sm leading-relaxed font-medium">
+                                  {part.description!}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
+
+                        {/* Enhanced Running Indicator */}
                         {isRunning && (
-                          <div className="mt-3 flex items-center space-x-2 text-xs text-gray-500">
-                            <div className="w-4 h-4 border-2 border-green-300 border-t-transparent rounded-full animate-spin"></div>
-                            <span>Executing...</span>
+                          <div className="mt-4 flex items-center justify-center space-x-3 text-blue-600 bg-blue-50 rounded-xl p-3 border border-blue-200">
+                            <div className="relative">
+                              <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></div>
+                              <div className="absolute inset-0 w-4 h-4 border-2 border-transparent border-b-blue-400 rounded-full animate-spin" style={{animationDirection: 'reverse', animationDuration: '0.75s'}}></div>
+                            </div>
+                            <span className="text-sm font-semibold">Processing task...</span>
                           </div>
                         )}
                       </div>

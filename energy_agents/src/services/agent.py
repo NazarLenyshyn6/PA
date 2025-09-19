@@ -57,13 +57,7 @@ class AgentService:
             # --- Tool usage events ---
             if chunk["event"] == "on_tool_start":
                 tool_name = chunk["name"]
-                task = (
-                    chunk["data"]["input"]["task"]
-                    if chunk["name"] == "ml_agent"
-                    else question
-                )
-                print(tool_name)
-                print(task)
+                task = chunk["data"]["input"].get("task", question)
                 yield f"data: {json.dumps({'type': 'tool_start', 'tool': tool_name, 'description': task})}\n\n"
 
             elif chunk["event"] == "on_tool_end":
