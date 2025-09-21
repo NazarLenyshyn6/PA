@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Send, Plus, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, Trash2, Info, ChevronDown, ChevronRight, Move, Maximize2, Minimize2, RefreshCw, BookOpen, Download, X, Terminal, Edit, Search, Globe, List, Monitor } from 'lucide-react';
 import { apiEndpoints, getAuthHeaders } from '@/lib/api';
+import InteractivePlot from '@/components/InteractivePlot';
 
 
 interface Message {
@@ -334,6 +335,18 @@ const ChatPage: React.FC = () => {
                     // Handle image data - convert base64 to data URI if needed
                     const imageData = jsonData.data.startsWith('data:') ? jsonData.data : `data:image/png;base64,${jsonData.data}`;
                     currentContent += `\n![Generated Image](${imageData})\n`;
+                  } else if (jsonData.type === 'interactive_image') {
+                    // Handle interactive Plotly image data
+                    const plotId = `plot-${Date.now()}-${Math.random()}`;
+                    console.log('🔍 SSE Interactive Image Debug:', {
+                      type: jsonData.type,
+                      dataType: typeof jsonData.data,
+                      hasData: !!jsonData.data?.data,
+                      hasLayout: !!jsonData.data?.layout,
+                      dataIsArray: Array.isArray(jsonData.data?.data),
+                      fullData: jsonData.data
+                    });
+                    currentContent += `\n__INTERACTIVE_PLOT__${plotId}|${JSON.stringify(jsonData.data)}__END_PLOT__\n`;
                   } else if (jsonData.type === 'tool_start') {
                     // Handle tool start event for resend
                     const toolName = jsonData.tool;
@@ -558,6 +571,90 @@ const ChatPage: React.FC = () => {
     return parts.length > 0 ? parts : [{ type: 'text', content }];
   };
 
+  const parseContentWithInteractivePlots = (content: string) => {
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+    const plotRegex = /__INTERACTIVE_PLOT__([^|]+)\|(.+?)__END_PLOT__/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    // Find all matches for both patterns and sort by position
+    const allMatches = [];
+
+    // Find code blocks
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+      allMatches.push({
+        type: 'code',
+        index: match.index,
+        length: match[0].length,
+        language: match[1] || '',
+        content: match[2].trim()
+      });
+    }
+
+    // Reset regex
+    codeBlockRegex.lastIndex = 0;
+
+    // Find interactive plots
+    while ((match = plotRegex.exec(content)) !== null) {
+      allMatches.push({
+        type: 'interactive_plot',
+        index: match.index,
+        length: match[0].length,
+        plotId: match[1],
+        plotData: match[2]
+      });
+    }
+
+    // Sort matches by index
+    allMatches.sort((a, b) => a.index - b.index);
+
+    // Process matches in order
+    for (const match of allMatches) {
+      if (match.index > lastIndex) {
+        parts.push({
+          type: 'text',
+          content: content.slice(lastIndex, match.index)
+        });
+      }
+
+      if (match.type === 'code') {
+        // Only treat as special code block if it's explicitly Python
+        if (match.language && match.language.toLowerCase() === 'python') {
+          parts.push({
+            type: 'code',
+            language: 'python',
+            content: match.content
+          });
+        } else {
+          // Treat non-Python code blocks as regular text
+          parts.push({
+            type: 'text',
+            content: match.content
+          });
+        }
+      } else if (match.type === 'interactive_plot') {
+        console.log('Non-streaming: Found interactive plot', { plotId: match.plotId, plotData: match.plotData });
+        parts.push({
+          type: 'interactive_plot',
+          plotId: match.plotId,
+          plotData: match.plotData
+        });
+      }
+
+      lastIndex = match.index + match.length;
+    }
+
+    if (lastIndex < content.length) {
+      parts.push({
+        type: 'text',
+        content: content.slice(lastIndex)
+      });
+    }
+
+    return parts.length > 0 ? parts : [{ type: 'text', content }];
+  };
+
   // Parse streaming content with immediate code block formatting
   const parseStreamingContent = (content: string) => {
     // Apply same normalization as regular parsing
@@ -565,98 +662,121 @@ const ChatPage: React.FC = () => {
       .replace(/\u00A0/g, ' ')  // Remove non-breaking spaces
       .replace(/\r\n/g, '\n')   // Normalize newlines
       .replace(/\r/g, '\n');    // Handle old Mac newlines
-      
-    // Just parse for code blocks - images will be handled by renderMarkdownText
-    return parseStreamingContentForCode(normalizedContent);
+
+    // Parse for both code blocks and interactive plots
+    return parseStreamingContentWithPlots(normalizedContent);
   };
-  
-  // Helper function to parse code blocks in streaming content
-  const parseStreamingContentForCode = (content: string) => {
+
+  const parseStreamingContentWithPlots = (content: string) => {
+    const codeStartRegex = /```(\w+)?/g;
+    const plotRegex = /__INTERACTIVE_PLOT__([^|]+)\|(.+?)__END_PLOT__/g;
     const parts = [];
     let currentIndex = 0;
-    
-    // Look for code block starts (```python, ```javascript, etc.)
-    const codeStartRegex = /```(\w+)?/g;
+
+    // Find all matches for both patterns and sort by position
+    const allMatches = [];
+
+    // Find code blocks
     let match;
-    
     while ((match = codeStartRegex.exec(content)) !== null) {
-      // Add text before code block
+      allMatches.push({
+        type: 'code_start',
+        index: match.index,
+        length: match[0].length,
+        language: match[1] || '',
+        fullMatch: match[0]
+      });
+    }
+
+    // Reset regex
+    codeStartRegex.lastIndex = 0;
+
+    // Find interactive plots
+    while ((match = plotRegex.exec(content)) !== null) {
+      allMatches.push({
+        type: 'interactive_plot',
+        index: match.index,
+        length: match[0].length,
+        plotId: match[1],
+        plotData: match[2]
+      });
+    }
+
+    // Sort matches by index
+    allMatches.sort((a, b) => a.index - b.index);
+
+    // Process matches in order
+    for (const match of allMatches) {
       if (match.index > currentIndex) {
         parts.push({
           type: 'text',
           content: content.slice(currentIndex, match.index)
         });
       }
-      
-      // Find the end of this code block or end of content
-      const codeStart = match.index;
-      const language = match[1] || 'text';
-      const codeContentStart = match.index + match[0].length;
-      
-      // Look for closing ```
-      const remainingContent = content.slice(codeContentStart);
-      const codeEndMatch = remainingContent.match(/^[\s\S]*?```/);
-      
-      if (codeEndMatch) {
-        // Complete code block found
-        const codeContent = remainingContent.slice(0, codeEndMatch[0].length - 3).replace(/^\n/, '');
-        
-        // Only treat as special code block if it's explicitly Python
-        if (language.toLowerCase() === 'python') {
-          parts.push({
-            type: 'code',
-            language: 'python',
-            content: codeContent
-          });
+
+      if (match.type === 'interactive_plot') {
+        console.log('Streaming: Found interactive plot', { plotId: match.plotId, plotData: match.plotData });
+        parts.push({
+          type: 'interactive_plot',
+          plotId: match.plotId,
+          plotData: match.plotData
+        });
+        currentIndex = match.index + match.length;
+      } else if (match.type === 'code_start') {
+        // Handle code block parsing (similar to existing logic)
+        const codeStartIndex = match.index;
+        const language = match.language;
+        const remainingContent = content.slice(codeStartIndex + (match.fullMatch?.length || match.length));
+
+        const codeEndRegex = /```/;
+        const endMatch = codeEndRegex.exec(remainingContent);
+
+        if (endMatch) {
+          const codeContent = remainingContent.slice(0, endMatch.index);
+
+          if (language && language.toLowerCase() === 'python') {
+            parts.push({
+              type: 'code',
+              language: 'python',
+              content: codeContent.replace(/^\n/, '')
+            });
+          } else {
+            parts.push({
+              type: 'text',
+              content: codeContent.replace(/^\n/, '')
+            });
+          }
+
+          currentIndex = codeStartIndex + (match.fullMatch?.length || match.length) + endMatch.index + 3;
         } else {
-          // Treat non-Python code blocks as regular text (just remove the ``` markers)
-          parts.push({
-            type: 'text',
-            content: codeContent
-          });
+          const codeContent = remainingContent.replace(/^\n/, '');
+
+          if (language && language.toLowerCase() === 'python') {
+            parts.push({
+              type: 'streaming-code',
+              language: 'python',
+              content: codeContent
+            });
+          } else {
+            parts.push({
+              type: 'text',
+              content: codeContent
+            });
+          }
+
+          currentIndex = content.length;
         }
-        currentIndex = codeStart + match[0].length + codeEndMatch[0].length;
-      } else {
-        // Incomplete code block (still streaming)
-        const codeContent = remainingContent.replace(/^\n/, '');
-        
-        // Only treat as special streaming code block if it's explicitly Python
-        if (language.toLowerCase() === 'python') {
-          parts.push({
-            type: 'streaming-code',
-            language: 'python',
-            content: codeContent
-          });
-        } else {
-          // Treat non-Python code blocks as regular text (just remove the ``` markers)
-          parts.push({
-            type: 'text',
-            content: codeContent
-          });
-        }
-        currentIndex = content.length;
-        break;
       }
     }
-    
-    // Add remaining text
+
     if (currentIndex < content.length) {
-      const remainingText = content.slice(currentIndex);
-      // Check if the remaining text is just starting a code block
-      if (remainingText.match(/^```\w*$/)) {
-        parts.push({
-          type: 'text',
-          content: remainingText
-        });
-      } else {
-        parts.push({
-          type: 'text',
-          content: remainingText
-        });
-      }
+      parts.push({
+        type: 'text',
+        content: content.slice(currentIndex)
+      });
     }
-    
-    return parts;
+
+    return parts.length > 0 ? parts : [{ type: 'text', content }];
   };
 
   // Render markdown text with proper formatting
@@ -1253,7 +1373,7 @@ const ChatPage: React.FC = () => {
 
   // Render message content with code highlighting
   const renderMessageContent = (content: string, messageId: string, isStreaming = false) => {
-    const parts = isStreaming ? parseStreamingContent(content) : parseMessageContent(content);
+    const parts = isStreaming ? parseStreamingContent(content) : parseContentWithInteractivePlots(content);
     
     return (
       <div className="prose max-w-none">
@@ -1296,7 +1416,7 @@ const ChatPage: React.FC = () => {
                       )}
                       {isCollapsed && (
                         <span className="ml-2 text-slate-500 text-xs">
-                          ({part.content.split('\n').length} lines)
+                          ({(part.content || '').split('\n').length} lines)
                         </span>
                       )}
                     </span>
@@ -1304,7 +1424,7 @@ const ChatPage: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     {!isStreamingCode && !isCollapsed && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); copyToClipboard(part.content, codeId); }}
+                        onClick={(e) => { e.stopPropagation(); copyToClipboard(part.content || '', codeId); }}
                         className="flex items-center space-x-1 px-2 py-1 text-slate-600 hover:text-slate-800 hover:bg-gray-100 transition-all duration-200 rounded-lg text-xs font-medium"
                       >
                         {copiedCode === codeId ? (
@@ -1335,10 +1455,17 @@ const ChatPage: React.FC = () => {
                 )}
               </div>
             );
+          } else if (part.type === 'interactive_plot') {
+            console.log('Rendering interactive plot:', { plotId: part.plotId, plotData: part.plotData });
+            return (
+              <div key={index}>
+                <InteractivePlot plotData={part.plotData || ''} plotId={part.plotId || ''} />
+              </div>
+            );
           } else {
             return (
               <div key={index} className="whitespace-pre-wrap leading-relaxed text-slate-800">
-                {renderMarkdownText(part.content.trim())}
+                {renderMarkdownText((part.content || '').trim())}
               </div>
             );
           }
@@ -1368,6 +1495,11 @@ const ChatPage: React.FC = () => {
             // Handle image data - convert base64 to data URI if needed
             const imageData = jsonData.data.startsWith('data:') ? jsonData.data : `data:image/png;base64,${jsonData.data}`;
             cleanedContent += `\n![Generated Image](${imageData})\n`;
+          } else if (jsonData.type === 'interactive_image') {
+            // Handle interactive Plotly image data
+            const plotId = `plot-${Date.now()}-${Math.random()}`;
+            console.log('🔍 Cleanup Interactive Image Debug:', jsonData.data);
+            cleanedContent += `\n__INTERACTIVE_PLOT__${plotId}|${JSON.stringify(jsonData.data)}__END_PLOT__\n`;
           }
         } catch (error) {
           // If JSON parsing fails, treat as plain text
@@ -1412,6 +1544,10 @@ const ChatPage: React.FC = () => {
                 // Handle image data - convert base64 to data URI if needed
                 const imageData = jsonData.data.startsWith('data:') ? jsonData.data : `data:image/png;base64,${jsonData.data}`;
                 cleanedContent += `\n![Generated Image](${imageData})\n`;
+              } else if (jsonData.type === 'interactive_image') {
+                // Handle interactive Plotly image data
+                const plotId = `plot-${Date.now()}-${Math.random()}`;
+                cleanedContent += `\n__INTERACTIVE_PLOT__${plotId}|${JSON.stringify(jsonData.data)}__END_PLOT__\n`;
               }
             } catch (error) {
               // If JSON parsing fails, treat as plain text
@@ -1756,6 +1892,21 @@ const ChatPage: React.FC = () => {
                     currentContent += `\n![Generated Image](${imageData})\n`;
                     if (DEBUG_STREAMING) {
                       console.log(`🖼️ Added image with data URI, length:`, imageData.length);
+                    }
+                  } else if (jsonData.type === 'interactive_image') {
+                    // Handle interactive Plotly image data
+                    const plotId = `plot-${Date.now()}-${Math.random()}`;
+                    console.log('🔍 SSE Interactive Image Debug:', {
+                      type: jsonData.type,
+                      dataType: typeof jsonData.data,
+                      hasData: !!jsonData.data?.data,
+                      hasLayout: !!jsonData.data?.layout,
+                      dataIsArray: Array.isArray(jsonData.data?.data),
+                      fullData: jsonData.data
+                    });
+                    currentContent += `\n__INTERACTIVE_PLOT__${plotId}|${JSON.stringify(jsonData.data)}__END_PLOT__\n`;
+                    if (DEBUG_STREAMING) {
+                      console.log(`📊 Added interactive plot with ID:`, plotId);
                     }
                   } else if (jsonData.type === 'tool_start') {
                     // Handle tool start event

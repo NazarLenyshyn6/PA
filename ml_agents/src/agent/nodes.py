@@ -51,12 +51,13 @@ def tool_execute(state: AgentState):
     args = tool_call["args"].copy()
     args.update({"state": state})
 
-    analysis_report, image = tool.invoke(args)
+    analysis_report, image, interactive_image = tool.invoke(args)
     return {
         "agent_scratchpad": [
             ToolMessage(content=analysis_report, tool_call_id=tool_call["id"])
         ],
         "visualization": image,
+        "interactive_visualization": interactive_image,
     }
 
 

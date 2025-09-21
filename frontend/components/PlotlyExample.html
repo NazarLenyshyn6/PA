@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Plotly Chart from Backend JSON</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .chart-container {
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .chart-header {
+            background: #f8f9fa;
+            padding: 12px 16px;
+            border-bottom: 1px solid #ddd;
+            font-weight: 600;
+            color: #333;
+        }
+        .chart-content {
+            padding: 16px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Interactive Plotly Chart from Backend JSON</h1>
+        <p>This example demonstrates rendering interactive Plotly charts from JSON strings received from Python backend (fig.to_json()).</p>
+
+        <div>
+            <button onclick="loadSampleChart1()">Load Sample Line Chart</button>
+            <button onclick="loadSampleChart2()">Load Sample Bar Chart</button>
+            <button onclick="loadBase64Chart()">Load Chart with Base64 Data</button>
+            <button onclick="clearChart()">Clear Chart</button>
+        </div>
+
+        <div id="status"></div>
+
+        <div class="chart-container">
+            <div class="chart-header">
+                Interactive Visualization
+            </div>
+            <div class="chart-content">
+                <div id="plotly-chart" style="width: 100%; height: 500px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="PlotlyRenderer.js"></script>
+    <script>
+        // Initialize the renderer
+        const renderer = new PlotlyRenderer('plotly-chart');
+
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = type;
+        }
+
+        // Sample JSON data that would come from Python's fig.to_json()
+        const sampleChart1 = {
+            "data": [
+                {
+                    "hovertemplate": "<b>Date:</b> %{x}<br><b>Value:</b> %{y:,.0f}<extra></extra>",
+                    "line": {"color": "#1f77b4", "width": 2},
+                    "mode": "lines+markers",
+                    "name": "Sample Data",
+                    "x": ["2024-01", "2024-02", "2024-03", "2024-04", "2024-05", "2024-06"],
+                    "y": [100, 150, 120, 180, 200, 175],
+                    "type": "scatter"
+                }
+            ],
+            "layout": {
+                "title": {"text": "Sample Line Chart", "x": 0.5, "xanchor": "center"},
+                "xaxis": {"title": {"text": "Month"}},
+                "yaxis": {"title": {"text": "Value"}},
+                "hovermode": "x unified",
+                "showlegend": true
+            }
+        };
+
+        const sampleChart2 = {
+            "data": [
+                {
+                    "marker": {"color": ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]},
+                    "name": "Categories",
+                    "x": ["Category A", "Category B", "Category C", "Category D"],
+                    "y": [20, 35, 30, 25],
+                    "type": "bar"
+                }
+            ],
+            "layout": {
+                "title": {"text": "Sample Bar Chart", "x": 0.5, "xanchor": "center"},
+                "xaxis": {"title": {"text": "Categories"}},
+                "yaxis": {"title": {"text": "Values"}},
+                "showlegend": false
+            }
+        };
+
+        // Example with base64-encoded data (similar to your backend)
+        const base64Chart = {
+            "data": [
+                {
+                    "name": "Base64 Data",
+                    "x": ["A", "B", "C", "D", "E"],
+                    "y": {"dtype": "i4", "bdata": "FAAAAB4AAAAoAAAAMgAAADwAAAA="},
+                    "type": "bar"
+                }
+            ],
+            "layout": {
+                "title": {"text": "Chart with Base64 Encoded Data", "x": 0.5, "xanchor": "center"},
+                "xaxis": {"title": {"text": "Items"}},
+                "yaxis": {"title": {"text": "Values"}}
+            }
+        };
+
+        function loadSampleChart1() {
+            updateStatus('Loading sample line chart...', 'info');
+            renderer.renderPlot(sampleChart1)
+                .then(() => updateStatus('Line chart loaded successfully!', 'success'))
+                .catch(err => updateStatus('Error: ' + err.message, 'error'));
+        }
+
+        function loadSampleChart2() {
+            updateStatus('Loading sample bar chart...', 'info');
+            renderer.renderPlot(sampleChart2)
+                .then(() => updateStatus('Bar chart loaded successfully!', 'success'))
+                .catch(err => updateStatus('Error: ' + err.message, 'error'));
+        }
+
+        function loadBase64Chart() {
+            updateStatus('Loading chart with base64 data...', 'info');
+            renderer.renderPlot(base64Chart)
+                .then(() => updateStatus('Base64 chart loaded successfully!', 'success'))
+                .catch(err => updateStatus('Error: ' + err.message, 'error'));
+        }
+
+        function clearChart() {
+            const container = document.getElementById('plotly-chart');
+            if (window.Plotly) {
+                Plotly.purge(container);
+            }
+            container.innerHTML = '<div style="text-align: center; padding: 50px; color: #666;">Chart cleared. Click a button above to load a chart.</div>';
+            updateStatus('Chart cleared.', 'info');
+        }
+
+        // Example of handling data from server
+        function simulateServerData() {
+            // This simulates receiving JSON string from your backend
+            const jsonString = JSON.stringify(sampleChart1);
+
+            // Parse and render (this is what your frontend would do)
+            renderer.renderPlot(jsonString);
+        }
+
+        // Example of dynamic updates (for real-time data)
+        function simulateDynamicUpdate() {
+            let counter = 0;
+            const interval = setInterval(() => {
+                const updatedData = {
+                    ...sampleChart1,
+                    data: [{
+                        ...sampleChart1.data[0],
+                        y: sampleChart1.data[0].y.map(val => val + Math.random() * 20 - 10)
+                    }],
+                    layout: {
+                        ...sampleChart1.layout,
+                        title: {
+                            ...sampleChart1.layout.title,
+                            text: `Dynamic Chart (Update ${++counter})`
+                        }
+                    }
+                };
+
+                renderer.updatePlot(updatedData);
+
+                if (counter >= 5) {
+                    clearInterval(interval);
+                    updateStatus('Dynamic update simulation completed.', 'success');
+                }
+            }, 2000);
+        }
+
+        // Initialize with empty state
+        clearChart();
+    </script>
+</body>
+</html>

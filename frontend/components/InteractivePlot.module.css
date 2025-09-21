@@ -1,0 +1,174 @@
+/* Enhanced scrolling for interactive visualizations */
+.scrollableViz {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+.scrollableViz::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollableViz::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 4px;
+}
+
+.scrollableViz::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+  border: 1px solid #f8fafc;
+}
+
+.scrollableViz::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.scrollableViz::-webkit-scrollbar-corner {
+  background: #f8fafc;
+}
+
+/* Smooth scrolling animation */
+.scrollableViz {
+  scroll-behavior: smooth;
+}
+
+/* Enhanced plot container */
+.plotContainer {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.plotContainer:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* Full width mode adjustments */
+.fullWidthContainer {
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
+}
+
+/* Width transition animation */
+.widthTransition {
+  transition: width 0.4s ease-in-out, min-width 0.4s ease-in-out, max-width 0.4s ease-in-out;
+}
+
+/* Resizable wrapper styles */
+.resizableWrapper {
+  position: relative;
+  user-select: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ensure centering during resize */
+.resizableWrapper[style*="width"] {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+}
+
+.resizableWrapper:hover .resizeHandle {
+  opacity: 0.6;
+}
+
+.resizeHandle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  z-index: 20;
+  opacity: 0;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.resizeHandle:hover {
+  opacity: 0.8 !important;
+}
+
+.resizeHandle::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 32px;
+  background: white;
+  border-radius: 1px;
+  opacity: 0.9;
+}
+
+.resizeHandle.active {
+  opacity: 1 !important;
+  background-color: #3b82f6;
+}
+
+.resizeOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(59, 130, 246, 0.1);
+  backdrop-filter: blur(1px);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+}
+
+/* Scroll indicators animation */
+.scrollIndicator {
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+}
+
+.scrollIndicator:hover {
+  opacity: 1;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .scrollableViz {
+    max-height: 70vh;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  }
+
+  .plotContainer {
+    min-width: 600px;
+  }
+
+  .scrollIndicator {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .scrollableViz {
+    max-height: 60vh;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .plotContainer {
+    min-width: 500px;
+  }
+
+  .scrollIndicator {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
+  }
+}
+
+/* Touch device enhancements */
+@media (hover: none) and (pointer: coarse) {
+  .scrollableViz::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  .scrollableViz::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 6px;
+  }
+}

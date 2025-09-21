@@ -16,6 +16,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* Plotly.js CDN for reliable loading of interactive charts */}
+        <script
+          src="https://cdn.plot.ly/plotly-latest.min.js"
+          async
+          defer
+        />
+      </head>
       <body className={inter.className}>{children}</body>
     </html>
   )

@@ -29,6 +29,7 @@ def chat(agent_request: AgentRequest):
         data=agent_request.data,  # Base64-encoded CSV data
     )
     return {
+        "interactive_visualization": agent_response["interactive_visualization"],
         "visualization": agent_response["visualization"],
         "analysis_report": agent_response["analysis_report"],
     }

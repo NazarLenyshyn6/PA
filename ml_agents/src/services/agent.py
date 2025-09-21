@@ -39,6 +39,7 @@ dependencies = [
     "networkx",
     "prophet>=1.2",
     "nltk>=3.9",
+    "plotly",
 ]
 
 
@@ -80,10 +81,12 @@ class AgentService:
                 "tools": tools_description,
                 "agent_scratchpad": [HumanMessage(content=question)],
                 "visualization": None,
+                "interactive_visualization": None,
             }
         )
 
         return {
             "visualization": response["visualization"],
+            "interactive_visualization": response["interactive_visualization"],
             "analysis_report": response["agent_scratchpad"][-1].content,
         }

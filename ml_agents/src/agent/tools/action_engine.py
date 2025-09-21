@@ -35,6 +35,13 @@ def _code_generation(
             "dependencies": dependencies,
         }
     ).code
+    print("")
+    print()
+    print()
+    print("=" * 100)
+    print(generated_code)
+    print()
+    print()
     return generated_code
 
 
@@ -68,7 +75,11 @@ def _code_execution(code: str, state: AgentState):
         exec(code, global_context)
 
         # Extract outputs expected from the executed code
-        return global_context["analysis_report"], global_context.get("image")
+        return (
+            global_context["analysis_report"],
+            global_context.get("image"),
+            global_context.get("interactive_image"),
+        )
 
     except Exception as e:
         return (
@@ -79,6 +90,7 @@ Result: None
 --- ERROR MESSAGE ---
 {str(e)}
 """,
+            None,
             None,
         )
 
@@ -153,7 +165,7 @@ def action_engine(
     )
 
     # Execute the generated code in an isolated context
-    analysis_report, image = _code_execution(code, state)
+    analysis_report, image, interactive_image = _code_execution(code, state)
 
     # Return the analysis report and optional visualization
-    return analysis_report, image
+    return analysis_report, image, interactive_image

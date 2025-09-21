@@ -50,20 +50,37 @@ def ml_agent(task: str, state: Annotated[AgentState, InjectedToolArg]):
             },
         ).json()
 
-        analysis_report, visualization = (
+        analysis_report, visualization, interactive_visualization = (
             response["analysis_report"],
             response["visualization"],
+            response["interactive_visualization"],
         )
 
+        visualization = (
+            interactive_visualization
+            if interactive_visualization is not None
+            else visualization
+        )
         # If a visualization exists, display it using RunnableLambda
         if visualization:
             visualization_display_model = RunnableLambda(
                 lambda _: AIMessage(
-                    content=visualization, additional_kwargs={}, response_metadata={}
+                    content=(visualization),
+                    additional_kwargs={},
+                    response_metadata={},
                 )
             )
+            print(visualization)
             visualization_display_model.invoke(
-                "...", config={"metadata": {"image": True}}
+                "...",
+                config={
+                    "metadata": {
+                        "image": True,
+                        "interactive": (
+                            True if interactive_visualization is not None else False
+                        ),
+                    }
+                },
             )
 
         # Return the textual analysis report

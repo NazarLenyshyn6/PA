@@ -85,26 +85,38 @@ __
 
 ---
 
-### MODE-SPECIFIC RULES
 
-#### Time Series Visualization Mode
-- Translate instructions into **time series visualization code only**.
-- Use line plots, trend plots, or time series-specific plots.
-- All plots in a single figure with grid layout.
-- **Maximum of 4 subplots overall; never more than 4.**
-- Legends must not overlap.
-- Initialize `image = None` (mandatory).
-- Save figure to buffer, encode as base64, assign to `image`.
-- Use headless backend:
+### PLOTLY VISUALIZATION RULES (MANDATORY TOP PRIORITY)
+- **Plotly is the only default visualization library.** Seaborn/Matplotlib is allowed **only if Plotly cannot produce the required chart type**, and all Plotly rules still apply.
+- **Figure Serialization**  
+  - Every Plotly figure must be serialized to JSON using:  
+    ```python
+    interactive_image = fig.to_json()
+    ```  
+  - **`interactive_image` must always contain a valid, non-empty JSON string.**
+- **Subplot Rules**
+  - Maximum of 4 subplots in a single figure.  
+  - Use `make_subplots` with proper `rows`, `cols`, `subplot_titles`.  
+  - Ensure no overlapping titles, labels, or legends.
+  - Use automatic layout adjustments: `fig.update_layout(margin=dict(l=50, r=50, t=50, b=50))` and `fig.update_layout(height=800, width=1200)`.
+- **Axis & Label Rules**
+  - Set `xaxis_title` and `yaxis_title` explicitly for every subplot.  
+  - Legends must not overlap subplots (`fig.update_layout(legend=dict(x=1, y=1))`).
+- **Data Integrity**
+  - Always filter or align datasets by timestamp (`ds`) before plotting.  
+  - Never plot empty or misaligned data.
+- **UI Rendering Safeguards**
+  - If no data is available for a subplot, skip it but still create a placeholder subplot to avoid UI errors.
+  - Always assign `interactive_image = None` initially and overwrite **only after successful fig.to_json()**.
+  - Validate that `interactive_image` is a valid JSON string; log any skips in `analysis_report`.
+- **Mandatory Imports**
   ```python
-  import matplotlib
-  matplotlib.use("Agg")
+  import plotly.graph_objects as go
+  from plotly.subplots import make_subplots
   
-#### STRICT VISUALIZATION SPACING RULES
-    - Subplots, their titles, axis labels, tick labels, legends, and any text must never overlap.
-    - Use automatic layout managers (e.g., plt.tight_layout(), constrained_layout=True) to guarantee spacing.
-    - Subplots must be evenly spaced with clear separation at all times.
-    - Overlapping of subplot boundaries, labels, or legends is strictly forbidden.
+- **No Inline Displays**
+  - Do not call fig.show(); only serialize to interactive_image.
+  - Do not use Matplotlib inline display backends; UI will fail if fig.show() is used.
 
 **DATASETS CONTEXT:**  
 {data_summaries}
@@ -119,18 +131,18 @@ __
         - Treat the task as a step-by-step action plan.
         - ALL STEPS AND SUB-STEPS MUST BE TRANSLATED INTO EXECUTABLE PYTHON CODE.
         - Follow exact variable names, step order, and sub-step details.
-        - Ensure analysis_report is fully populated with results, numeric values, predictions, or safe skips.
-        - Always initialize analysis_report = [] and image = None where required.
-        - If visualization includet it maximum 4 subplots overall.
+        - Initialize: analysis_report = [] and interactive_image = None.
+        - Always choose Plotly as top-priority visualization.
+        - Maximum of 4 subplots per figure.
         - Import only required libraries at the start.
         - Never import unused libraries.
-        - Never initialize variables that are not used.
-        - When computing residuals, errors, or evaluation metrics, always merge or align forecasted values with actuals by timestamp to prevent broadcasting or length mismatch errors.
-        - Never mock or shortcut data. Always operate on the provided dataset.
-        - All outputs must be in a single python block.
-        - Code must run immediately, be robust, production-level, and error-free.
-        - Always use Prophet as top-priority forecasting model unless the plan specifies otherwise or Prophet performs poorly.
-        - **Prophet predictions must start strictly from the last/latest timestamp in the dataset.**
+        - Never initialize unused variables.
+        - Align forecasts, residuals, and evaluation metrics by timestamp to prevent broadcasting errors.
+        - Never mock or shortcut data. Operate only on provided dataset.
+        - All outputs must be in a single Python block.
+        - Use Prophet as top-priority forecasting model unless the plan specifies otherwise or Prophet performs poorly.
+        - Prophet predictions must start strictly from the last/latest timestamp in the dataset.
+        - Ensure interactive_image is valid JSON; log skips or errors in analysis_report.
     """
         ),
     ]

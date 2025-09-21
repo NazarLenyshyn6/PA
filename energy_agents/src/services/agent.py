@@ -76,7 +76,12 @@ class AgentService:
                 and chunk["data"].get("output", False)
             ):
                 data = chunk["data"]["output"].content
-                yield f"data: {json.dumps({'type': 'image', 'data': data})}\n\n"
+                if chunk["metadata"]["interactive"]:
+                    print("INTERACTIVE VISUALIZATION")
+                    yield f"data: {json.dumps({'type': 'interactive_image', 'data': data})}\n\n"
+                else:
+                    print("STATIC VISUALIZATION")
+                    yield f"data: {json.dumps({'type': 'image', 'data': data})}\n\n"
 
             # Stream incremental text outputs
             elif chunk["event"] == "on_chat_model_stream":

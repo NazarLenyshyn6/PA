@@ -32,3 +32,4 @@ class AgentState(TypedDict):
     tools: str
     agent_scratchpad: Annotated[List[AnyMessage], add_messages]
     visualization: Optional[str]
+    interactive_visualization: Optional[str]
