@@ -21,6 +21,10 @@ def ml_agent(task: str, state: Annotated[AgentState, InjectedToolArg]):
     """
     Use this tool when the user asks any question related to data analysis, data visualization, predictions, or any other ML tasks on structured data.
 
+    The user may directly provide information (such as numbers, datasets, or parameters)
+    for visualization or computation, and this tool must be used to process and display
+    results with the user’s data.
+
     Args:
         task: The task the ML agent must take into consideration and output results for. Strictly declarative, with a clear definition of what must be done.
     """

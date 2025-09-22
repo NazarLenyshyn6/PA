@@ -39,5 +39,6 @@ def insight_agent(state: Annotated[AgentState, InjectedToolArg]):
         result = response["answer"]
         return result
 
-    except Exception:
+    except Exception as e:
+        print(e)
         return "Failed"
