@@ -1133,7 +1133,7 @@ const ChatPage: React.FC = () => {
     let currentIndex = 0;
 
     // Split content by tool start markers only (now includes toolId|toolName|description)
-    const toolStartRegex = /__TOOL_START__([^|]+)\|([^|]+)\|(.*?)__TOOL_END__/g;
+    const toolStartRegex = /__TOOL_START__([^|]+)\|([^|]+)\|([\s\S]*?)__TOOL_END__/g;
     const markers = [];
     let match;
 
